@@ -84,7 +84,7 @@ top1_songs <- billboard %>%
   filter(peak_position == 1) %>% 
   group_by(song_id) %>% 
   summarize(
-    n_top1 = n(),
+    n_top1 = sum(week_position == 1),
     week_sale = min(week)
   )
 
@@ -133,7 +133,7 @@ library(ggrepel)
 p2 <- top1_performers %>% 
   ggplot(aes(decade, n_top1)) +
   geom_boxplot() +
-  geom_text_repel(aes(label = performer), size = 3, data = top1_performers %>% filter(n_top1 > 100)) +
+  geom_text_repel(aes(label = performer), size = 3, data = top1_performers %>% filter(n_top1 > 20)) +
   labs(x = NULL, y = NULL,
        title = "By performer",
        subtitle = "( ) denotes # of performers of top 1 songs")
