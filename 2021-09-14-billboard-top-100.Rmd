@@ -104,14 +104,21 @@ range(billboard$week)
 p1 <- top1_songs %>% 
   filter(decade > 1950, decade < 2020) %>% 
   group_by(decade) %>% 
-  mutate(n_songs = n()) %>% 
+  mutate(
+    n_songs = n(),
+    mean_n_top1 = mean(n_top1)
+    ) %>% 
   ungroup() %>% 
   mutate(decade = glue::glue("{decade}s\n({n_songs})")) %>% 
   ggplot(aes(decade, n_top1)) +
   geom_boxplot() +
-  labs(x = NULL, y = "# of weeks staying at top 1",
+  geom_line(aes(y = mean_n_top1, group = 1), color = "red", size = .5) +
+  geom_point(aes(y = mean_n_top1), color = "red", size = 2) +
+  scale_y_log10(breaks = 2^(0:5)) +
+  labs(x = NULL, y = "# of weeks staying at top 1 (log scale)",
        title = "By song",
-       subtitle = "( ) denotes # of top 1 songs")
+       subtitle = "( ) denotes # of top 1 songs.\nRed point denotes mean.") +
+  theme(panel.grid.minor.y = element_blank())
 
 ```
 
@@ -121,7 +128,10 @@ top1_performers <- top1_songs %>%
   filter(decade > 1950, decade < 2020) %>% 
   group_by(decade, performer) %>% 
   summarize(n_top1 = sum(n_top1), .groups = "drop_last") %>% 
-  mutate(n_performers = n()) %>% 
+  mutate(
+    n_performers = n(),
+    mean_n_top1 = mean(n_top1)
+    ) %>% 
   ungroup() %>% 
   mutate(decade = glue::glue("{decade}s\n({n_performers})"))
 
@@ -130,10 +140,14 @@ library(ggrepel)
 p2 <- top1_performers %>% 
   ggplot(aes(decade, n_top1)) +
   geom_boxplot() +
-  geom_text_repel(aes(label = performer), size = 3, data = top1_performers %>% filter(n_top1 > 20)) +
+  geom_text_repel(aes(label = performer), size = 3, data = top1_performers %>% filter(n_top1 > 25)) +
+  geom_line(aes(y = mean_n_top1, group = 1), color = "red", size = .5) +
+  geom_point(aes(y = mean_n_top1), color = "red", size = 2) +
+  scale_y_log10(breaks = 2^(0:6)) +
   labs(x = NULL, y = NULL,
        title = "By performer",
-       subtitle = "( ) denotes # of performers of top 1 songs")
+       subtitle = "( ) denotes # of performers of top 1 songs.\nRed point denotes mean.") +
+  theme(panel.grid.minor.y = element_blank())
 
 ```
 
