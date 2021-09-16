@@ -82,10 +82,11 @@ Using your processed dataset, create your unique visualization.
 
 top1_songs <- billboard %>% 
   filter(peak_position == 1) %>% 
-  group_by(song_id) %>% 
+  group_by(performer, song, song_id) %>% 
   summarize(
     n_top1 = sum(week_position == 1),
-    week_sale = min(week)
+    week_sale = min(week),
+    .groups = "drop"
   )
 
 top1_songs %>% 
@@ -95,15 +96,12 @@ top1_songs %>%
 
 ```{r}
 
-top1_hits <- billboard %>% 
-  filter(peak_position == 1) %>% 
-  distinct(performer, song, song_id) %>% 
-  left_join(top1_songs, by = "song_id") %>% 
+top1_songs <- top1_songs %>% 
   mutate(decade = 10 * (year(week_sale) %/% 10))
 
 range(billboard$week)
 
-p1 <- top1_hits %>% 
+p1 <- top1_songs %>% 
   filter(decade > 1950, decade < 2020) %>% 
   group_by(decade) %>% 
   mutate(n_songs = n()) %>% 
@@ -119,11 +117,10 @@ p1 <- top1_hits %>%
 
 ```{r}
 
-top1_performers <- top1_hits %>% 
+top1_performers <- top1_songs %>% 
   filter(decade > 1950, decade < 2020) %>% 
   group_by(decade, performer) %>% 
-  summarize(n_top1 = sum(n_top1)) %>% 
-  group_by(decade) %>% 
+  summarize(n_top1 = sum(n_top1), .groups = "drop_last") %>% 
   mutate(n_performers = n()) %>% 
   ungroup() %>% 
   mutate(decade = glue::glue("{decade}s\n({n_performers})"))
