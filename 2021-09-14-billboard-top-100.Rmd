@@ -114,7 +114,8 @@ p1 <- top1_songs %>%
   geom_boxplot() +
   geom_line(aes(y = mean_n_top1, group = 1), color = "red", size = .5) +
   geom_point(aes(y = mean_n_top1), color = "red", size = 2) +
-  scale_y_log10(breaks = 2^(0:5)) +
+  annotation_logticks(sides = "l") +
+  scale_y_log10(breaks = c(1, 2, 3, 4, 5, 10, 20)) +
   labs(x = NULL, y = "# of weeks staying at top 1 (log scale)",
        title = "By song",
        subtitle = "( ) denotes # of top 1 songs.\nRed point denotes mean.") +
@@ -143,7 +144,8 @@ p2 <- top1_performers %>%
   geom_text_repel(aes(label = performer), size = 3, data = top1_performers %>% filter(n_top1 > 25)) +
   geom_line(aes(y = mean_n_top1, group = 1), color = "red", size = .5) +
   geom_point(aes(y = mean_n_top1), color = "red", size = 2) +
-  scale_y_log10(breaks = 2^(0:6)) +
+  annotation_logticks(sides = "l") +
+  scale_y_log10(breaks = c(1:5, seq(10, 60, 10))) +
   labs(x = NULL, y = NULL,
        title = "By performer",
        subtitle = "( ) denotes # of performers of top 1 songs.\nRed point denotes mean.") +
