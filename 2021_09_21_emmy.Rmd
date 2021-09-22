@@ -1,0 +1,173 @@
+---
+title: "Emmy awards"
+date: 2021-09-22
+output: html_output
+editor_options: 
+  chunk_output_type: console
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+```
+
+# Load the weekly Data
+
+Dowload the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2021-09-21")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+nominees <- tt$nominees %>% 
+  mutate(
+    category = category %>% 
+      str_remove("\\s-\\s\\d{4}$") %>% 
+      str_to_lower()
+  )
+
+```
+
+Need to regex for "category"
+
+```{r}
+
+nominees %>% 
+  count(category, sort = TRUE)
+
+```
+
+Lots of NAs in "production"
+
+```{r}
+
+nominees %>% 
+  count(production, sort = TRUE) 
+
+```
+
+Winners are 20 percent of all nominees
+
+```{r}
+
+nominees %>% 
+  count(type, sort = TRUE) %>% 
+  mutate(prop = n / sum(n))
+
+```
+
+Famous titles
+
+```{r}
+
+nominees %>% 
+  count(title, sort = TRUE)
+
+```
+
+More nominees in recent years
+
+```{r}
+
+nominees %>% 
+  count(year, sort = TRUE)
+
+range(nominees$year)
+
+nominees %>% 
+  ggplot(aes(year)) +
+  geom_bar() +
+  labs(x = NULL, y = "# of nominees",
+       title = "# of nominees have significantly increased since 2007",
+       caption = "Source: emmys.com")
+
+```
+
+Distributors expand from Big 3 networks to Cable, and then Internet
+
+```{r}
+
+nominees %>% 
+  count(distributor, sort = TRUE)
+
+nominees %>% 
+  group_by(distributor) %>% 
+  slice_min(year, n = 1) %>% 
+  distinct(distributor, year) %>% 
+  ggplot(aes(year)) +
+  geom_bar() +
+  labs(x = NULL, y = "# of distributors debuted",
+       title = "# of distributors have also increased since 2007",
+       caption = "Source: emmys.com"
+       )
+
+```
+
+```{r}
+
+p1 <- nominees %>% 
+  filter(!is.na(distributor)) %>% 
+  group_by(distributor) %>% 
+  mutate(n_years = length(unique(year))) %>%
+  ungroup() %>% 
+  filter(n_years > 4) %>% 
+  distinct(year, distributor) %>% 
+  mutate(
+    distributor = distributor %>% 
+      fct_reorder(year, .fun = min) %>% 
+      fct_rev()
+    ) %>% 
+  ggplot(aes(year, distributor)) +
+  geom_point(size = .5) +
+  labs(x = NULL, y = NULL,
+       title = "Transmission media expand from\nradio wave to cable, satellite,\nand the internet",
+       subtitle = "Emmy nominee distributors\nwith more than 4 year nominations",
+       caption = "Source: emmys.com")
+
+ggsave("image/emmy_disties.png", p1, width = 4, height = 8)
+
+```
