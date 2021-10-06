@@ -1,0 +1,239 @@
+---
+title: "Registered Nurses"
+date: 2021-10-06
+output: html_output
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+```
+
+# Load the weekly Data
+
+Dowload the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2021-10-05")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+nurses <- tt$nurses %>% 
+  janitor::clean_names()
+
+```
+
+```{r}
+
+nurses %>% 
+  count(state, sort = TRUE) # 23 years
+
+nurses %>% 
+  count(year, sort = TRUE) # 54 states
+
+range(nurses$year) # from 1998 to 2020
+
+nurses %>% 
+  distinct(state) %>% 
+  pull(state) # 50 States + "District of Columbia", "Guam", "Puerto Rico", "Virgin Islands"
+
+```
+
+```{r}
+
+skimr::skim(nurses)
+
+nurses %>% 
+  filter(is.na(total_employed_rn))
+
+nurses_51 <- nurses %>% 
+  filter(!state %in% c("Guam", "Puerto Rico", "Virgin Islands"))
+
+skimr::skim(nurses_51)
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+nurses_51 %>% 
+  group_by(year) %>% 
+  summarize(total_employed_rn = sum(total_employed_rn), .groups = "drop_last") %>% 
+  ggplot(aes(year, total_employed_rn)) +
+  geom_line() +
+  expand_limits(y = 0) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(x = NULL, y = "persons",
+       title = "National employment of registered nurses is increasing",
+       caption = "Source: Data.World")
+  
+```
+
+```{r}
+
+employed_rn_national_aggregate <- nurses_51 %>% 
+  group_by(year) %>% 
+  summarize(total_employed_rn = sum(total_employed_rn), .groups = "drop_last")
+
+nurses_51 %>% 
+  distinct(year, total_employed_national_aggregate, total_employed_healthcare_national_aggregate) %>% 
+  bind_cols(employed_rn_national_aggregate %>% select(-year)) %>% 
+  mutate(
+    ratio_to_total = total_employed_rn / total_employed_national_aggregate,
+    ratio_to_healthcare = total_employed_rn / total_employed_healthcare_national_aggregate
+  ) %>% 
+  pivot_longer(starts_with("ratio_to")) %>% 
+  mutate(name = if_else(name == "ratio_to_total",
+                        "Share in total employment",
+                        "Share in healthcare employment")) %>% 
+  ggplot(aes(year, value, color = name)) +
+  geom_line() +
+  expand_limits(y = 0) +
+  scale_y_continuous(labels = scales::percent) +
+  facet_wrap(vars(name), scales = "free_y") +
+  theme(legend.position = "none") +
+  labs(x = NULL, y = NULL,
+       title = "Shares of registered nurses in national employment are decreasing",
+       caption = "Source: Data.World")
+```
+
+```{r}
+
+state_slope <- nurses_51 %>% 
+  mutate(ratio_to_healthcare = total_employed_rn / total_employed_healthcare_state_aggregate) %>% 
+  nest(data = !c(state)) %>% 
+  mutate(
+    model = map(data, ~ lm(ratio_to_healthcare ~ year, data = .x)),
+    slope = map_dbl(model, ~coef(.x)[2])
+    ) %>% 
+  select(state, slope)
+
+p <- nurses_51 %>% 
+  mutate(ratio_to_healthcare = total_employed_rn / total_employed_healthcare_state_aggregate) %>% 
+  left_join(state_slope) %>% 
+  mutate(
+    state = str_wrap(state, width = 15),
+    state = fct_reorder(state, -slope),
+    year = lubridate::make_date(year)
+    ) %>% 
+  ggplot(aes(year, ratio_to_healthcare, color = state)) +
+  geom_line() +
+  geom_smooth(method = "lm", se = FALSE, size = 0.3, color = "black") +
+  scale_y_continuous(labels = scales::label_percent(accuracy = 1)) +
+  scale_x_date(date_labels = "%y",
+               breaks = c(as.Date("2000-01-01"), as.Date("2010-01-01"),
+                          as.Date("2020-01-01"))) +
+  facet_wrap(vars(state)) +
+  theme(
+    legend.position = "none",
+    strip.text = element_text(size = 7),
+    plot.title = element_text(size = rel(0.9))
+    ) +
+  labs(x = "Year", y = NULL,
+       title = "Share of registered nurses in healthcare employment decreases nationally",
+       subtitle = "In which state increases or decreases?",
+       caption = "Source: Data.World")
+
+p
+
+```
+
+
+```{r}
+
+nurses_51 %>% 
+  mutate(total_hourly_wage = total_employed_rn * hourly_wage_avg) %>% 
+  group_by(year) %>% 
+  summarize(
+    total_employed_rn = sum(total_employed_rn),
+    total_hourly_wage = sum(total_hourly_wage),
+    hourly_wage_avg = total_hourly_wage / total_employed_rn
+  ) %>% 
+  ggplot(aes(year, hourly_wage_avg)) +
+  geom_line() +
+  expand_limits(y = 0) +
+  scale_y_continuous(labels = scales::dollar) +
+  labs(x = NULL, y = "hourly wage",
+       title = "National average of hourly wage is increasing",
+       caption = "Source: Data.World")
+
+```
+
+```{r}
+
+nurses_51 %>% 
+  mutate(total_annual_salary = total_employed_rn * annual_salary_avg) %>% 
+  group_by(year) %>% 
+  summarize(
+    total_employed_rn = sum(total_employed_rn),
+    total_annual_salary = sum(total_annual_salary),
+    annual_salary_avg = total_annual_salary / total_employed_rn
+  ) %>% 
+  ggplot(aes(year, annual_salary_avg)) +
+  geom_line() +
+  expand_limits(y = 0) +
+  scale_y_continuous(labels = scales::dollar) +
+  labs(x = NULL, y = "annual salary",
+       title = "National average of annual salary is increasing",
+       caption = "Source: Data.World")
+
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/nurses.png", p, width = 6, height = 8)
+
+```
