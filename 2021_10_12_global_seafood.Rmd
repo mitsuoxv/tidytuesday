@@ -1,0 +1,186 @@
+---
+title: "Global Seafood"
+date: 2021-10-12
+output: html_output
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+```
+
+# Load the weekly Data
+
+Dowload the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2021-10-12")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+farmed <- tt$`aquaculture-farmed-fish-production` %>% 
+  janitor::clean_names()
+captured_vs_farmed <- tt$`capture-fisheries-vs-aquaculture` %>% 
+  janitor::clean_names() %>% 
+  rename(farmed = aquaculture_production_metric_tons,
+         captured = capture_fisheries_production_metric_tons)
+captured <- tt$`capture-fishery-production` %>% 
+  janitor::clean_names()
+consumption <- tt$`fish-and-seafood-consumption-per-capita` %>% 
+  janitor::clean_names()
+stock <- tt$`fish-stocks-within-sustainable-levels` %>% 
+  janitor::clean_names()
+fishery <- tt$`global-fishery-catch-by-sector` %>% 
+  janitor::clean_names()
+production <- tt$`seafood-and-fish-production-thousand-tonnes` %>% 
+  janitor::clean_names()
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+captured_vs_farmed
+
+```{r}
+
+captured_vs_farmed %>% 
+  count(code, sort = TRUE)
+
+captured_vs_farmed %>% 
+  count(entity, sort = TRUE)
+
+range(captured_vs_farmed$year) # from 1960 to 2018
+
+captured_vs_farmed %>% 
+  pivot_longer(farmed:captured) %>% 
+  mutate(name = factor(name, labels = c("Captured", "Farmed"))) %>% 
+  filter(entity == "World") %>% 
+  ggplot(aes(year, value)) +
+  geom_line() +
+  scale_y_log10(labels = scales::comma_format()) +
+  facet_wrap(vars(name)) +
+  labs(x = NULL, y = "World production (metric tons, log scale)",
+       title = "Fish capture hit the ceiling, and farming is the futute")
+
+captured_vs_farmed_world <- captured_vs_farmed %>% 
+  filter(entity == "World") %>% 
+  select(year, farmed_total = farmed, captured_total = captured)
+
+captured_vs_farmed %>% 
+  pivot_longer(farmed:captured) %>% 
+  mutate(name = factor(name, labels = c("Captured", "Farmed"))) %>% 
+  filter(entity %in% c("High income", "Middle income", "Low income")) %>% 
+  mutate(entity = fct_relevel(entity, "High income", "Middle income")) %>% 
+  ggplot(aes(year, value, fill = entity)) +
+  geom_area(position = "fill") +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(labels = scales::percent_format(), expand = c(0, 0)) +
+  scale_fill_brewer(palette = "Set2") +
+  facet_wrap(vars(name)) +
+  labs(x = NULL, y = "Share in metric tons",
+       title = "Middle income countries increase share both in caputure and farming",
+       fill = "Country group")
+
+captured_vs_farmed_share <- captured_vs_farmed %>% 
+  filter(!is.na(code), entity != "World") %>% 
+  left_join(captured_vs_farmed_world, by = "year") %>% 
+  group_by(decade = 10 * (year %/% 10), entity) %>% 
+  summarize(across(farmed:captured_total, sum, na.rm = TRUE)) %>% 
+  mutate(
+    farmed_share = farmed / farmed_total,
+    captured_share = captured / captured_total
+    ) %>% 
+  ungroup()
+
+captured_vs_farmed_share %>% 
+  filter(farmed_share > 0.1) %>% 
+  distinct(entity) %>% 
+  pull(entity)
+
+captured_vs_farmed_share %>% 
+  filter(captured_share > 0.1) %>% 
+  distinct(entity) %>% 
+  pull(entity)
+
+captured_vs_farmed %>% 
+  filter(entity %in% c("China", "Japan", "Indonesia", "Peru")) %>%
+  left_join(captured_vs_farmed_world, by = "year") %>% 
+  mutate(
+    farmed_share = farmed / farmed_total,
+    captured_share = captured / captured_total
+    ) %>% 
+  select(entity, year, farmed_share, captured_share) %>% 
+  pivot_longer(farmed_share:captured_share) %>% 
+  mutate(name = factor(name, labels = c("Captured", "Farmed"))) %>% 
+  ggplot(aes(year, value, color = entity)) +
+  geom_line() +
+  scale_x_continuous(breaks = c(1960, 1980, 2000)) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  facet_wrap(vars(name)) +
+  labs(x = NULL, y = "Share in metric tons",
+       color = "Country",
+       title = "China and Indonesia are the big 2 both in capture and farming")
+
+```
+
+
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave(
+  filename = "My TidyTuesday Plot.png",
+  device = "png")
+
+```
