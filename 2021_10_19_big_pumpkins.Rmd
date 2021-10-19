@@ -1,0 +1,217 @@
+---
+title: "Big Pumpkins"
+date: 2021-10-19
+output: html_output
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+```
+
+# Load the weekly Data
+
+Dowload the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2021-10-19")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+pumpkins <- tt$pumpkins %>% 
+  separate(id, c("year", "type"), "-")
+
+pumpkins %>% 
+  count(place, sort = TRUE) # "EXH" and "DMG"?
+
+pumpkins %>% 
+  count(weight_lbs, sort = TRUE)
+
+pumpkins %>% 
+  count(ott, sort = TRUE)
+
+pumpkins %>% 
+  count(est_weight, sort = TRUE)
+
+pumpkins %>% 
+  count(pct_chart, sort = TRUE)
+
+pumpkins <- pumpkins %>% 
+  mutate(
+    year = parse_integer(year),
+    place = parse_number(place, na = c("EXH", "DMG")),
+    weight_lbs = parse_number(weight_lbs),
+    seed_mother = parse_character(seed_mother, na = c("unknown", "Unknown", "NA")),
+    pollinator_father = parse_character(pollinator_father, na = c("unknown", "Unknown", "open", "Open", "NA")),
+    pollinator_father = if_else(pollinator_father %in% c("self", "SELF"), "Self", pollinator_father),
+    ott = parse_number(ott, na = c("0.0", "NA")),
+    est_weight = parse_number(est_weight, na = c("0.00", "NA")),
+    pct_chart = parse_number(pct_chart, na = c("0.0", "NA"))
+    )
+
+skimr::skim(pumpkins)
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+By type.
+
+```{r Visualize}
+
+pumpkins %>% 
+  count(type, sort = TRUE)
+
+pumpkins %>% 
+  ggplot(aes(type, weight_lbs)) +
+  geom_boxplot()
+
+pumpkins %>% 
+  ggplot(aes(weight_lbs)) +
+  geom_histogram(binwidth = 50, boundary = 0) +
+  facet_wrap(vars(type))
+
+```
+
+P = "Giant Pumpkin" only.
+
+```{r}
+
+great_pumpkins <- pumpkins %>% 
+  filter(type == "P")
+
+great_pumpkins %>% 
+  filter(ott < 1000) %>% # exclude strange records
+  ggplot(aes(ott, est_weight)) +
+  geom_point(alpha = .1) +
+  geom_smooth(se = FALSE)
+
+great_pumpkins %>% 
+  filter(est_weight < 3000) %>% 
+  ggplot(aes(est_weight, weight_lbs)) +
+  geom_point(alpha = .1) +
+  geom_smooth(method = "lm", se = FALSE) +
+  coord_fixed()
+
+great_pumpkins %>% 
+  group_by(year) %>% 
+  summarize(
+    q1 = quantile(weight_lbs, probs = .25),
+    median = median(weight_lbs),
+    q3 = quantile(weight_lbs, probs = .75),
+    mean = mean(weight_lbs)
+    ) %>% 
+  ggplot(aes(x = year)) +
+  geom_line(aes(y = median)) +
+  geom_ribbon(aes(ymin = q1, ymax = q3), alpha = .3) +
+  geom_point(aes(y = mean), color = "red") +
+  scale_x_continuous(labels = scales::label_number(accuracy = 1, big.mark = ""),
+                     breaks = 2013:2021)
+
+```
+
+```{r}
+
+skimr::skim(great_pumpkins)
+
+great_pumpkins %>% 
+  count(seed_mother, sort = TRUE)
+
+great_pumpkins %>% 
+  filter(!is.na(seed_mother)) %>% 
+  group_by(seed_mother) %>% 
+  summarize(
+    n = n(),
+    weight_lbs = mean(weight_lbs)
+    ) %>% 
+  filter(n > 30) %>% 
+  arrange(desc(weight_lbs))
+
+great_pumpkins %>% 
+  count(pollinator_father, sort = TRUE)
+
+great_pumpkins %>% 
+  filter(!is.na(pollinator_father)) %>% 
+  group_by(pollinator_father) %>% 
+  summarize(
+    n = n(),
+    weight_lbs = mean(weight_lbs)
+    ) %>% 
+  filter(n > 30) %>% 
+  arrange(desc(weight_lbs))
+
+p <- great_pumpkins %>% 
+  filter(!is.na(pollinator_father)) %>% 
+  mutate(
+    father_is_self = pollinator_father == "Self",
+    pollinator = if_else(father_is_self, "Self", "Not self")
+    ) %>% 
+  add_count(pollinator) %>% 
+  mutate(pollinator = glue::glue("{pollinator} ({n})")) %>% 
+  ggplot(aes(weight_lbs, pollinator)) +
+  geom_boxplot() +
+  labs(x = "Weight (pounds)", y = "Pollinator",
+       title = "Self pollinated tend to weight less in Great Pumpkins",
+       subtitle = "( ) denotes # of observations",
+       caption = "BigPumpkins.com")
+
+```
+
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/pumpkins.png", p, width = 6, height = 4)
+
+```
