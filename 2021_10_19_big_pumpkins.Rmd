@@ -86,7 +86,6 @@ pumpkins <- pumpkins %>%
     weight_lbs = parse_number(weight_lbs),
     seed_mother = parse_character(seed_mother, na = c("unknown", "Unknown", "NA")),
     pollinator_father = parse_character(pollinator_father, na = c("unknown", "Unknown", "open", "Open", "NA")),
-    pollinator_father = if_else(pollinator_father %in% c("self", "SELF"), "Self", pollinator_father),
     ott = parse_number(ott, na = c("0.0", "NA")),
     est_weight = parse_number(est_weight, na = c("0.00", "NA")),
     pct_chart = parse_number(pct_chart, na = c("0.0", "NA"))
@@ -189,17 +188,17 @@ great_pumpkins %>%
 p <- great_pumpkins %>% 
   filter(!is.na(pollinator_father)) %>% 
   mutate(
-    father_is_self = pollinator_father == "Self",
-    pollinator = if_else(father_is_self, "Self", "Not self")
+    pollinator_father = str_to_lower(pollinator_father),
+    pollinator = if_else(pollinator_father == "self", "Self", "Not self")
     ) %>% 
   add_count(pollinator) %>% 
   mutate(pollinator = glue::glue("{pollinator} ({n})")) %>% 
   ggplot(aes(weight_lbs, pollinator)) +
   geom_boxplot() +
   labs(x = "Weight (pounds)", y = "Pollinator",
-       title = "Self pollinated tend to weight less in Great Pumpkins",
+       title = "Self pollinated tend to weigh less in Great Pumpkins",
        subtitle = "( ) denotes # of observations",
-       caption = "BigPumpkins.com")
+       caption = "Source: BigPumpkins.com")
 
 ```
 
