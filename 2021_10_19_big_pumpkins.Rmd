@@ -84,8 +84,12 @@ pumpkins <- pumpkins %>%
     year = parse_integer(year),
     place = parse_number(place, na = c("EXH", "DMG")),
     weight_lbs = parse_number(weight_lbs),
-    seed_mother = parse_character(seed_mother, na = c("unknown", "Unknown", "NA")),
-    pollinator_father = parse_character(pollinator_father, na = c("unknown", "Unknown", "open", "Open", "NA")),
+    seed_mother = seed_mother %>% 
+      str_to_lower() %>% 
+      parse_character(na = c("unknown")),
+    pollinator_father = pollinator_father %>% 
+      str_to_lower() %>% 
+      parse_character(na = c("unknown")),
     ott = parse_number(ott, na = c("0.0", "NA")),
     est_weight = parse_number(est_weight, na = c("0.00", "NA")),
     pct_chart = parse_number(pct_chart, na = c("0.0", "NA"))
@@ -185,23 +189,44 @@ great_pumpkins %>%
   filter(n > 30) %>% 
   arrange(desc(weight_lbs))
 
-p <- great_pumpkins %>% 
+great_pumpkins_pf <- great_pumpkins %>% 
   filter(!is.na(pollinator_father)) %>% 
   mutate(
-    pollinator_father = str_to_lower(pollinator_father),
-    pollinator = if_else(pollinator_father == "self", "Self", "Not self")
-    ) %>% 
+    pollinator = case_when(
+      pollinator_father == "self" ~ "Self",
+      pollinator_father == "open" ~ "Open",
+      TRUE ~ "Carefully-chosen\ncross",
+      )
+    )
+
+p <- great_pumpkins_pf %>% 
   add_count(pollinator) %>% 
-  mutate(pollinator = glue::glue("{pollinator} ({n})")) %>% 
+  mutate(
+    pollinator = glue::glue("{pollinator} ({n})"),
+    pollinator = fct_reorder(pollinator, weight_lbs)
+    ) %>% 
   ggplot(aes(weight_lbs, pollinator)) +
   geom_boxplot() +
   labs(x = "Weight (pounds)", y = "Pollinator",
-       title = "Self pollinated tend to weigh less in Great Pumpkins",
+       title = "Carefully-chosen cross pollinated tend to weigh more\nin Great Pumpkins",
        subtitle = "( ) denotes # of observations",
        caption = "Source: BigPumpkins.com")
 
 ```
 
+```{r}
+
+library(ggstatsplot)
+
+great_pumpkins_pf %>% 
+  add_count(pollinator) %>% 
+  mutate(
+    pollinator = glue::glue("{pollinator} ({n})"),
+    pollinator = fct_reorder(pollinator, weight_lbs)
+    ) %>% 
+  ggbetweenstats(pollinator, weight_lbs)
+
+```
 
 
 # Save Image
