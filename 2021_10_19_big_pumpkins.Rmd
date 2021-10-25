@@ -161,6 +161,46 @@ great_pumpkins %>%
 
 ```{r}
 
+great_pumpkins %>% 
+  filter(ott > 20, ott < 1e3) %>% 
+  ggplot(aes(ott, weight_lbs)) +
+  geom_point(aes(color = place), alpha = .2, size = 1) +
+  scale_color_viridis_c(
+    guide = guide_colorbar(override.aes = list(alpha = 1))
+  ) +
+  labs(x = "Over-the-top inches", y = "Weight (lbs)")
+
+great_pumpkins %>% 
+  filter(ott > 20, ott < 1e3) %>% 
+  ggplot(aes(ott, weight_lbs)) +
+  geom_point(color = "gray60", alpha = .2, size = 1) +
+  geom_smooth(
+    aes(color = factor(year)),
+    method = "lm", formula = y ~ splines::bs(x, df = 3),
+    se = FALSE, size = 1, alpha = .5
+    ) +
+  scale_color_viridis_d() +
+  labs(x = "Over-the-top inches", y = "Weight (lbs)", color = NULL)
+
+```
+
+```{r}
+
+great_pumpkins %>% 
+  mutate(
+    country = fct_lump_n(country, n = 10),
+    country = fct_reorder(country, weight_lbs)
+  ) %>% 
+  ggplot(aes(country, weight_lbs, color = country)) +
+  geom_boxplot(outlier.color = NA) +
+  geom_jitter(alpha = .2, width = .2) +
+  labs(x = NULL, y = "Weight (lbs)") +
+  theme(legend.position = "none")
+
+```
+
+```{r}
+
 skimr::skim(great_pumpkins)
 
 great_pumpkins %>% 
@@ -228,7 +268,6 @@ great_pumpkins_pf %>%
 
 ```
 
-
 # Save Image
 
 Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
@@ -239,3 +278,93 @@ Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your p
 ggsave("image/pumpkins.png", p, width = 6, height = 4)
 
 ```
+
+# Model
+
+```{r}
+
+library(tidymodels)
+
+set.seed(123)
+spl <- great_pumpkins %>% 
+  filter(ott > 20, ott < 1e3) %>% 
+  initial_split(strata = weight_lbs)
+
+train <- training(spl)
+test <- testing(spl)
+
+set.seed(234)
+folds <- vfold_cv(train, strata = weight_lbs)
+
+```
+
+```{r}
+
+base_rec <- recipe(weight_lbs ~ ott + year + country + gpc_site,
+                   data = train) %>% 
+  step_other(country, gpc_site, threshold = .02)
+
+ind_rec <- base_rec %>% 
+  step_dummy(all_nominal_predictors())
+
+spline_rec <- ind_rec %>% 
+  step_bs(ott)
+
+```
+
+```{r}
+
+rf_spec <- rand_forest("regression", "ranger",
+                       trees = 1e3)
+
+mars_spec <- mars("regression", "earth")
+
+lm_spec <- linear_reg()
+
+```
+
+```{r}
+
+wf_set <- workflow_set(
+  list(base_rec, ind_rec, spline_rec),
+  list(rf_spec, mars_spec, lm_spec),
+  cross = FALSE
+)
+
+```
+
+```{r}
+
+doParallel::registerDoParallel(cores = 5)
+set.seed(2021)
+
+pumpkin_res <- workflow_map(
+  wf_set,
+  "fit_resamples",
+  resamples = folds
+)
+
+autoplot(pumpkin_res)
+
+collect_metrics(pumpkin_res)
+
+```
+
+```{r}
+
+final_fit <- extract_workflow(pumpkin_res, "recipe_3_linear_reg") %>% 
+  fit(train)
+
+tidy(final_fit) %>% 
+  arrange(desc(abs(estimate)))
+
+final_fit %>% 
+  augment(test) %>% 
+  rmse(weight_lbs, .pred)
+
+final_fit %>% 
+  augment(test) %>% 
+  rsq(weight_lbs, .pred)
+
+```
+
