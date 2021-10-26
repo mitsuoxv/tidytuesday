@@ -1,0 +1,178 @@
+---
+title: "Ultra running"
+date: 2021-10-26
+output: html_output
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+```
+
+# Load the weekly Data
+
+Dowload the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+ultra_rankings <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-10-26/ultra_rankings.csv')
+race <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-10-26/race.csv')
+
+
+```
+
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+ultra_rankings %>% 
+  glimpse()
+
+skimr::skim(ultra_rankings)
+
+race %>% 
+  glimpse()
+
+skimr::skim(race)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+ultra_rankings %>% 
+  count(runner, sort = TRUE)
+
+ultra_rankings %>% 
+  count(gender, sort = TRUE)
+
+ultra_rankings %>% 
+  count(nationality, sort = TRUE)
+
+race %>% 
+  count(event, sort = TRUE)
+
+race %>% 
+  count(race, sort = TRUE)
+
+race %>% 
+  count(city, sort = TRUE)
+
+race %>% 
+  count(country, sort = TRUE)
+
+race %>% 
+  count(participation, sort = TRUE)
+
+race <- race %>% 
+  mutate(participation = str_to_lower(participation))
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+race %>% 
+  ggplot(aes(distance)) +
+  geom_histogram()
+
+race %>% 
+  filter(distance == 0) %>% 
+  count(race, sort = TRUE) %>% View() # Looks like all 100 miles
+
+race_half <- race %>% 
+  filter(distance > 0, distance < 100) # 5 races from 33.3 to 77.5 km
+
+race_full <- race %>% 
+  anti_join(race_half, by = "race_year_id")
+
+ultra_rankings %>% 
+  anti_join(race_half, by = "race_year_id") %>% 
+  filter(!is.na(gender)) %>% 
+  ggplot(aes(time, fill = gender, color = gender)) +
+  geom_density(alpha = .3)
+  
+```
+
+Covid-19 reduces # of races from 2020
+
+```{r}
+
+race_full %>% 
+  ggplot(aes(date)) +
+  geom_histogram(binwidth = 30)
+
+library(lubridate)
+
+race_full_upto_2019 <- race_full %>% 
+  filter(year(date) <= 2019)
+
+```
+
+Home vs Away
+
+```{r}
+
+library(countrycode)
+
+home_away <- ultra_rankings %>% 
+  inner_join(race_full_upto_2019, by = "race_year_id") %>% 
+  mutate(
+    country = countrycode(country, origin = "country.name", destination = "iso3c"),
+    is_home = if_else(nationality == country, "Home", "Away")
+    ) %>% 
+  filter(!is.na(is_home))
+
+home_away %>% 
+  filter(time > dhours(8)) %>% 
+  group_by(is_home) %>% 
+  summarize(
+    mean = mean(time) %>% as.period(),
+    median = median(time) %>% as.period()
+  )
+
+p <- home_away %>% 
+  filter(time > dhours(8)) %>% 
+  ggplot(aes(time, fill = is_home, color = is_home)) +
+  geom_density(adjust = 1/2, alpha = .3) +
+  labs(title = "More slow runners participate in home race",
+       subtitle = "Around 100 miles, 2012 - 2019 races",
+       caption = "Source: Benjamin Nowak",
+       fill = "Race", color = "Race") +
+  theme_light()
+
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/ultra_running.png", p, width = 6, height = 4)
+
+```
