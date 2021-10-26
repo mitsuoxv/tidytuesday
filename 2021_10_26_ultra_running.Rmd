@@ -156,7 +156,7 @@ home_away %>%
 p <- home_away %>% 
   filter(time > dhours(8)) %>% 
   ggplot(aes(time, fill = is_home, color = is_home)) +
-  geom_density(adjust = 1/2, alpha = .3) +
+  geom_density(alpha = .3) +
   labs(title = "More slow runners participate in home race",
        subtitle = "Around 100 miles, 2012 - 2019 races",
        caption = "Source: Benjamin Nowak",
