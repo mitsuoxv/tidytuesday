@@ -1,0 +1,340 @@
+---
+title: "Dr Who"
+date: 2021-11-28
+output: html_output
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+library(scales)
+theme_set(theme_light())
+
+```
+
+# Load the weekly Data
+
+Dowload the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2021-11-23")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+episodes <- tt$episodes %>% 
+  filter(!is.na(uk_viewers)) %>% 
+  mutate(episode_title = fct_reorder(episode_title, first_aired)) %>% 
+  fill(season_number, .direction = "down")
+
+```
+
+
+# Visualize
+
+## Imitate the work by David Robinson.
+
+```{r Visualize}
+
+episodes %>% 
+  filter(season_number <= 4) %>% 
+  ggplot(aes(episode_title, uk_viewers, fill = factor(season_number))) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = NULL, y = "# of UK viewers (millions)", fill = "Season",
+       title = "UK viewers per episode of Dr. Who, Season 1-4")
+
+episodes %>% 
+  ggplot(aes(as.numeric(episode_title), uk_viewers, fill = factor(season_number))) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = NULL, y = "# of UK viewers (millions)", fill = "Season",
+       title = "UK viewers per episode of Dr. Who")
+  
+```
+
+```{r}
+
+episodes %>% 
+  filter(season_number <= 4) %>% 
+  ggplot(aes(episode_title, rating)) +
+  geom_line(group = 1) +
+  geom_point(aes(color = factor(season_number))) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = NULL, y = "Rating", color = "Season",
+       title = "Average rating per episode of Dr. Who, Season 1-4")
+
+episodes %>% 
+  ggplot(aes(as.numeric(episode_title), rating)) +
+  geom_line() +
+  geom_point(aes(color = factor(season_number))) +
+  geom_text(aes(label = episode_title), check_overlap = TRUE, hjust = 0, vjust = 0) +
+  geom_smooth(method = "loess") +
+  labs(x = NULL, y = "Rating", color = "Season",
+       title = "Average rating per episode of Dr. Who")
+
+```
+
+```{r}
+
+summarize_episodes <- function(df) {
+  df %>% 
+    summarize(
+      avg_rating = mean(rating),
+      avg_viewers = mean(uk_viewers),
+      n_episodes = n(),
+      t_test = broom::tidy(t.test(rating))
+    ) %>% 
+    unnest(t_test)
+}
+
+episodes %>% 
+  filter(season_number < 13) %>% 
+  group_by(season_number) %>% 
+  summarize_episodes()
+
+t.test(episodes$rating) %>% 
+  broom::tidy()
+
+tt$writers %>% 
+  count(story_number, sort = TRUE)
+
+episodes %>% 
+  left_join(tt$writers, by = "story_number") %>% 
+  mutate(writer = fct_lump_n(writer, n = 6)) %>% 
+  group_by(writer) %>% 
+  summarize_episodes() %>% 
+  mutate(writer = fct_reorder(writer, avg_rating)) %>% 
+  ggplot(aes(avg_rating, writer)) +
+  geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), height = .5) +
+  geom_point() +
+  labs(x = "Average rating (w/ 95% confidence interval)",
+       y = "Writer")
+
+```
+
+```{r}
+
+episodes %>% 
+  left_join(tt$writers, by = "story_number") %>% 
+  mutate(
+    writer = fct_lump_n(writer, n = 6),
+    writer = fct_reorder(writer, as.integer(episode_title))
+    ) %>% 
+  filter(writer != "Other") %>% 
+  ggplot(aes(as.integer(episode_title), rating)) +
+  geom_line(data = episodes, alpha = .2) +
+  geom_point() +
+  facet_wrap(vars(writer)) +
+  labs(x = "Episodes", y = "Rating")
+
+```
+
+```{r}
+
+episodes %>% 
+  left_join(tt$directors, by = "story_number") %>% 
+  mutate(
+    director = fct_lump_n(director, n = 6),
+    director = fct_reorder(director, as.integer(episode_title))
+    ) %>% 
+  filter(director != "Other") %>% 
+  ggplot(aes(as.integer(episode_title), rating)) +
+  geom_line(data = episodes, alpha = .2) +
+  geom_point() +
+  facet_wrap(vars(director)) +
+  labs(x = "Episodes", y = "Rating")
+
+```
+
+```{r}
+
+writers_wider <- episodes %>% 
+  left_join(tt$writers, by = "story_number") %>% 
+  mutate(
+    writer = fct_lump_n(writer, n = 6),
+    value = 1
+    ) %>% 
+  pivot_wider(names_from = writer, values_from = value, values_fill = 0) %>%
+  janitor::clean_names()
+
+lm(rating ~ russell_t_davies + mark_gatiss + other + steven_moffat +
+     toby_whithouse + gareth_roberts + chris_chibnall,
+   data = writers_wider) %>% 
+  summary()
+
+lm(rating ~ russell_t_davies + mark_gatiss + other + steven_moffat +
+     toby_whithouse + gareth_roberts + chris_chibnall + season_number,
+   data = writers_wider) %>% 
+  summary()
+
+lm(rating ~ russell_t_davies + mark_gatiss + other + steven_moffat +
+     toby_whithouse + gareth_roberts + chris_chibnall +
+     splines::ns(as.integer(episode_title), df = 3),
+   data = writers_wider) %>% 
+  summary()
+
+```
+
+```{r}
+
+episodes %>% 
+  ggplot(aes(as.integer(episode_title), rating)) +
+  geom_line() +
+  geom_smooth(method = "gam", formula = y ~ s(x, k = 3))
+
+?s
+?ns
+
+episode_predictions <- lm(rating ~ splines::ns(as.integer(episode_title), df = 3),
+   data = episodes) %>% 
+  broom::augment(data = episodes) %>% 
+  select(episode_title, story_number, rating, .fitted, .resid)
+
+episode_predictions %>% 
+  left_join(tt$writers, by = "story_number") %>% 
+  mutate(
+    writer = fct_lump_n(writer, n = 6),
+    writer = fct_reorder(writer, .resid)
+  ) %>% 
+  ggplot(aes(.resid, writer)) +
+  geom_boxplot()
+
+```
+
+## Imitate Julia Silge
+
+```{r}
+
+episodes %>% 
+  ggplot(aes(first_aired, uk_viewers)) +
+  geom_line() +
+  labs(x = NULL)
+
+```
+
+```{r}
+
+library(tidymodels)
+
+nrow(episodes)
+
+set.seed(123)
+# folds <- vfold_cv(episodes, v = 10, strata = uk_viewers)
+folds <- bootstraps(episodes, times = 100, strata = uk_viewers)
+
+```
+
+Recipe
+
+```{r}
+
+who_rec <- recipe(uk_viewers ~ first_aired,
+       data = episodes) %>% 
+  step_date(first_aired, features = "year") %>% 
+  step_holiday(first_aired, holidays = c("NewYearsDay", "ChristmasDay"),
+               keep_original_cols = FALSE)
+
+who_rec
+
+who_rec %>% 
+  prep() %>% 
+  bake(new_data = NULL)
+
+```
+
+Workflow
+
+```{r}
+
+linear_spec <- linear_reg(
+  mode = "regression",
+  engine = "lm"
+)
+
+who_wf <- workflow(who_rec, linear_spec)
+
+who_wf
+
+```
+
+Control
+
+```{r}
+
+ctrl_extract <- control_resamples(extract = extract_fit_engine)
+
+```
+
+Fit
+
+```{r}
+
+doParallel::registerDoParallel(cores = 5)
+
+set.seed(234)
+
+who_rs <- fit_resamples(who_wf, folds, control = ctrl_extract)
+
+who_rs
+
+```
+
+Extract
+
+```{r}
+
+who_rs %>% 
+  select(id, .extracts) %>% 
+  unnest(.extracts) %>% 
+  mutate(coefs = map(.extracts, tidy)) %>% 
+  unnest(coefs) %>% 
+  filter(term != "(Intercept)") %>% 
+  ggplot(aes(estimate, fill = term)) +
+  geom_histogram(show.legend = FALSE, bins = 12) +
+  facet_wrap(vars(term), scales = "free_x")
+
+```
+
+
