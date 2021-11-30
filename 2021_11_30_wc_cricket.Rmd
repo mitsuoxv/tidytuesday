@@ -1,0 +1,220 @@
+---
+title: "World Cup Cricket"
+date: 2021-11-30
+output: html_output
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+library(scales)
+theme_set(theme_light())
+
+library(lubridate)
+
+```
+
+# Load the weekly Data
+
+Dowload the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2021-11-30")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+matches <- tt$matches %>% 
+  mutate(
+    winner = if_else(winner == "U.A.E.", "United Arab Emirates", winner),
+    margin_type = str_remove(margin_type, "s$"),
+    ball_remaining = str_extract(ball_remaining, "\\d+"),
+    match_date = match_date %>% 
+      str_remove("-\\d+") %>% 
+      parse_date(format = "%b %d, %Y"),
+    loser = if_else(team1 == winner, team2,
+                    if_else(team2 == winner, team1, NA_character_))
+  )
+
+matches %>% 
+  filter(is.na(loser)) %>% 
+  View()
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+matches %>% 
+  ggplot(aes(match_date, margin)) +
+  geom_point(alpha = .3)
+  
+```
+
+```{r}
+
+matches %>% 
+  count(winner, sort = TRUE)
+
+matches %>% 
+  count(margin_type, sort = TRUE)
+
+matches %>% 
+  count(winner, margin_type, sort = TRUE)
+
+```
+
+```{r}
+
+matches %>% 
+  filter(!is.na(margin)) %>% 
+  mutate(winner = fct_reorder(winner, margin, .fun = median)) %>% 
+  ggplot(aes(margin, winner)) +
+  geom_boxplot() +
+  scale_x_log10()
+
+```
+
+```{r}
+
+matches %>% 
+  count(loser, sort = TRUE)
+
+range(matches$match_date)
+
+p1 <- matches %>% 
+  filter(!is.na(loser)) %>% 
+  filter(match_date < "2001-01-01") %>% 
+  count(winner) %>% 
+  rename(win = n) %>% 
+  left_join(matches %>% 
+              filter(match_date < "2001-01-01") %>%
+              count(loser),
+            by = c("winner" = "loser")) %>% 
+  rename(team = winner, lose = n) %>% 
+  mutate(
+    total = win + lose,
+    win_ratio = win / total
+  ) %>% 
+  arrange(desc(win_ratio)) %>% 
+  mutate(
+    high_ratio = qbeta(0.95, win, lose),
+    low_ratio = qbeta(0.05, win, lose)
+  ) %>% 
+  mutate(
+    team = glue::glue("{team} ({total})"),
+    team = fct_reorder(team, win_ratio)
+    ) %>% 
+  ggplot(aes(win_ratio, team)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = low_ratio, xmax = high_ratio), height = 0.5) +
+  scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
+  labs(x = "Winning ratio (w/ 90% confidence interval)", y = "Team",
+       title = "South Africa was the strongest from 1996 to 2000",
+       subtitle = "() denotes # of games exluding ties")
+
+```
+
+```{r}
+
+p2 <- matches %>% 
+  filter(!is.na(loser)) %>% 
+  filter(match_date >= "2001-01-01") %>% 
+  count(winner) %>% 
+  rename(win = n) %>% 
+  left_join(matches %>% 
+              filter(match_date >= "2001-01-01") %>%
+              count(loser),
+            by = c("winner" = "loser")) %>% 
+  rename(team = winner, lose = n) %>% 
+  mutate(
+    total = win + lose,
+    win_ratio = win / total
+  ) %>% 
+  arrange(desc(win_ratio)) %>% 
+  mutate(
+    high_ratio = qbeta(0.95, win, lose),
+    low_ratio = qbeta(0.05, win, lose)
+  ) %>% 
+  mutate(
+    team = glue::glue("{team} ({total})"),
+    team = fct_reorder(team, win_ratio)
+    ) %>% 
+  ggplot(aes(win_ratio, team)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = low_ratio, xmax = high_ratio), height = 0.5) +
+  scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
+  labs(x = "Winning ratio (w/ 90% confidence interval)", y = "Team",
+       title = "Australia was the strongest from 2001 to 2005",
+       subtitle = "() denotes # of games exluding ties")
+
+```
+
+```{r}
+
+library(patchwork)
+
+p12 <- p1 / p2
+
+p12_mod <- p12 + plot_annotation(
+  title = "The strongest team changes over time",
+  caption = "Source: ESPN Cricinfo"
+)
+
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/wc_cricket.png", p12_mod, width = 6, height = 8)
+
+```
