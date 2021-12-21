@@ -82,7 +82,7 @@ starbucks %>%
 
 starbucks %>% 
   filter(product_name == "Iced Caffè Mocha",
-         size == "tall", milk == 1, whip == 0) %>% View()
+         size == "tall", milk == 1, whip == 0)
 
 dim(starbucks) # 1147 rows
 
@@ -222,7 +222,7 @@ p2 <- diff_by_iced %>%
   geom_histogram(binwidth = 0.03) +
   geom_vline(xintercept = 0, lty = 2) +
   facet_wrap(vars(whip)) +
-  labs(x = "Hot minus Iced in the same product and milk in calories per ml",
+  labs(x = "Hot minus Iced in the same product, milk and size in calories per ml",
        title = "Ice dilutes calories per ml, naturally")
 
 diff_by_iced %>% 
