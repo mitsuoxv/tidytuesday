@@ -162,21 +162,27 @@ diff_by_size <- starbucks3 %>%
     ) %>% 
   mutate(calories_per_ml = calories / serv_size_m_l) %>% 
   group_by(product_name, milk, whip) %>% 
-  summarize(range_calories_per_ml = max(calories_per_ml) - min(calories_per_ml), .groups = "drop")
+  arrange(serv_size_m_l) %>% 
+  summarize(
+    range_calories_per_ml = first(calories_per_ml) - last(calories_per_ml),
+    .groups = "drop"
+  )
 
 diff_by_size %>% 
   count(whip)
 
-p1 <- diff_by_size %>% 
+p1 <- diff_by_size %>%
   ggplot(aes(range_calories_per_ml, whip)) +
   geom_boxplot() +
   geom_text(aes(label = product_name),
             data = diff_by_size %>% 
-              filter((whip == "whipped" & range_calories_per_ml > 0.2) |
-                       (whip == "no whip" & range_calories_per_ml > 0.1)),
-            vjust = 1, hjust = 1) +
-  labs(x = "Differences by size in the same product and milk in calories per ml", y = NULL,
-       title = "Differences by size in calories per ml increase if whipped,\nnaturally")
+              filter(range_calories_per_ml > 0.14 |
+                       range_calories_per_ml < -0.1),
+            vjust = 1, hjust = 0) +
+  geom_vline(xintercept = 0, lty = 2) +
+  expand_limits(x = 0.2) +
+  labs(x = "Differences in calories per ml from the smallest to the largest size\nin the same product and milk ", y = NULL,
+       title = "Whip increases calories per ml in the smallest size\ncompared to the largest size")
 
 ```
 
