@@ -1,0 +1,256 @@
+---
+title: "Starbucks drinks"
+date: 2021-12-21
+output: html_output
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+```
+
+# Load the weekly Data
+
+Dowload the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2021-12-21")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+starbucks <- tt$starbucks
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+36 products with the same product_name, size, milk and whip have two versions, high and low calories.
+
+```{r Visualize}
+
+starbucks %>% 
+  count(product_name, sort = TRUE)
+
+starbucks %>% 
+  filter(product_name == "Iced Caffè Mocha",
+         size == "tall", milk == 1, whip == 0) %>% View()
+
+dim(starbucks) # 1147 rows
+
+starbucks %>% 
+  count(product_name, size, milk, whip, sort = TRUE) # 1111 rows
+
+starbucks %>% 
+  count(product_name, size, milk, whip) %>% 
+  filter(n > 1) # 36 rows
+
+starbucks2 <- starbucks %>% 
+  mutate(whip = factor(whip, levels = c(0, 1),
+                       labels = c("no whip", "whipped"))) %>% 
+  add_count(product_name, size, milk, whip) %>% 
+  group_by(product_name, size, milk, whip) %>% 
+  arrange(calories) %>% 
+  mutate(calories_cat = row_number()) %>% 
+  ungroup()
+
+```
+
+```{r}
+
+starbucks2 %>% 
+  filter(n == 2) %>% 
+  unite(product, product_name, size, milk, whip) %>% 
+  ggplot(aes(calories, product, color = factor(calories_cat))) +
+  geom_point()
+
+```
+
+Basically size, like "tall", "short" and "trenta", determines serv_size_m_l. "venti" means either 709 or 591 ml.
+
+```{r}
+
+starbucks2 %>% 
+  count(size, sort = TRUE)
+
+starbucks2 %>% 
+  filter(
+    size %in% c("grande", "venti", "tall", "short"),
+    serv_size_m_l > 0
+    ) %>% 
+  ggplot(aes(serv_size_m_l, size)) +
+  geom_boxplot()
+
+starbucks2 %>% 
+  filter(size == "venti") %>% 
+  count(serv_size_m_l, sort = TRUE)
+
+```
+
+```{r}
+
+starbucks3 <- starbucks2 %>% 
+  filter(size %in% c("grande", "venti", "tall", "short")) %>% 
+  mutate(
+    size = factor(size, levels = c("short", "tall", "grande", "venti"))
+  )
+
+starbucks3 %>% 
+  filter(
+    calories_cat != 2, # remove high calory version
+    serv_size_m_l > 0,
+    calories > 0
+    ) %>% 
+  mutate(calories_per_ml = calories / serv_size_m_l) %>% 
+  ggplot(aes(calories_per_ml, size)) +
+  geom_boxplot() +
+  facet_wrap(vars(whip))
+
+diff_by_size <- starbucks3 %>% 
+  filter(
+    calories_cat != 2, 
+    serv_size_m_l > 0,
+    calories > 0
+    ) %>% 
+  mutate(calories_per_ml = calories / serv_size_m_l) %>% 
+  group_by(product_name, milk, whip) %>% 
+  summarize(range_calories_per_ml = max(calories_per_ml) - min(calories_per_ml), .groups = "drop")
+
+diff_by_size %>% 
+  count(whip)
+
+p1 <- diff_by_size %>% 
+  ggplot(aes(range_calories_per_ml, whip)) +
+  geom_boxplot() +
+  geom_text(aes(label = product_name),
+            data = diff_by_size %>% 
+              filter((whip == "whipped" & range_calories_per_ml > 0.2) |
+                       (whip == "no whip" & range_calories_per_ml > 0.1)),
+            vjust = 1, hjust = 1) +
+  labs(x = "Differences by size in the same product and milk in calories per ml", y = NULL,
+       title = "Differences by size in calories per ml increase if whipped,\nnaturally")
+
+```
+
+
+```{r}
+
+iced_products <- starbucks2 %>% 
+  filter(
+    calories_cat != 2, # remove high calory version
+    serv_size_m_l > 0,
+    calories > 0
+  ) %>% 
+  mutate(
+    iced = str_detect(product_name, "^Iced"),
+    product_name = str_remove(product_name, "^Iced ")
+    ) %>% 
+  filter(iced)
+
+hot_products <- starbucks2 %>% 
+  filter(
+    calories_cat != 2, # remove high calory version
+    serv_size_m_l > 0,
+    calories > 0
+  ) %>% 
+  mutate(iced = FALSE) %>% 
+  semi_join(iced_products, by = c("product_name", "size", "milk", "whip"))
+
+iced_products %>% 
+  semi_join(hot_products, by = c("product_name", "size", "milk", "whip")) %>%   bind_rows(hot_products) %>% 
+  count(whip)
+
+diff_by_iced <- iced_products %>% 
+  semi_join(hot_products, by = c("product_name", "size", "milk", "whip")) %>%   bind_rows(hot_products) %>% 
+  mutate(
+    calories_per_ml = calories / serv_size_m_l,
+    iced = if_else(iced, "iced", "hot")) %>% 
+  select(product_name, size, milk, whip, iced, calories_per_ml) %>% 
+  pivot_wider(names_from = iced, values_from = calories_per_ml) %>% 
+  mutate(diff_calory_by_iced = hot - iced)
+
+p2 <- diff_by_iced %>% 
+  ggplot(aes(diff_calory_by_iced)) +
+  geom_histogram(binwidth = 0.03) +
+  geom_vline(xintercept = 0, lty = 2) +
+  facet_wrap(vars(whip)) +
+  labs(x = "Hot minus Iced in the same product and milk in calories per ml",
+       title = "Ice dilutes calories per ml, naturally")
+
+diff_by_iced %>% 
+  filter(diff_calory_by_iced < 0)
+  
+```
+
+```{r}
+library(patchwork)
+
+p12 <- p1 / p2
+
+p12_mod <- p12 + plot_annotation(
+  title = "Whip and ice affect calories per ml",
+  caption = "Source: Starbucks Coffee Company"
+)
+
+p12_mod
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/starbucks.png", p12_mod, width = 6, height = 8)
+
+```
