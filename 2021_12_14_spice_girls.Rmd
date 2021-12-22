@@ -120,3 +120,123 @@ Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your p
 ggsave("image/spice_girls.png", p, width = 6, height = 4)
 
 ```
+
+# Replicate Julia Silge's topic modelling
+
+## Explore data
+
+```{r}
+
+lyrics %>% 
+  distinct(album_name)
+
+lyrics %>% 
+  distinct(album_name, song_name)
+
+```
+
+```{r}
+
+tidy_lyrics <- lyrics %>% 
+  mutate(song_name = str_replace_all(song_name, "\x92", "'")) %>% 
+  unnest_tokens(word, line) %>% 
+  anti_join(get_stopwords())
+
+```
+
+```{r}
+
+tidy_lyrics %>% 
+  count(word, sort = TRUE)
+
+tidy_lyrics %>% 
+  count(song_name, word, sort = TRUE)
+
+
+```
+
+## Train a topic model
+
+```{r}
+
+library(stm)
+
+lyrics_sparse <- tidy_lyrics %>% 
+  count(song_name, word) %>% 
+  cast_sparse(song_name, word, n)
+
+dim(lyrics_sparse)
+
+set.seed(123)
+topic_model <- stm(lyrics_sparse, K = 4, verbose = FALSE)
+
+summary(topic_model)
+
+```
+
+## Explore results
+
+```{r}
+
+word_topics <- tidy(topic_model, matrix = "beta")
+
+word_topics
+
+```
+
+```{r}
+
+word_topics %>% 
+  group_by(topic) %>% 
+  slice_max(beta, n = 10) %>% 
+  ungroup() %>% 
+  mutate(
+    topic = paste("Topic", topic),
+    term = reorder_within(term, beta, topic)
+    ) %>% 
+  ggplot(aes(beta, term, fill = topic)) +
+  geom_col(show.legend = FALSE) +
+  scale_y_reordered() +
+  facet_wrap(vars(topic), scales = "free_y") +
+  labs(x = expression(beta), y = NULL)
+
+```
+
+```{r}
+
+rownames(lyrics_sparse)
+
+song_topics <- tidy(topic_model, matrix = "gamma",
+                    document_names = rownames(lyrics_sparse))
+
+song_topics
+
+```
+
+```{r}
+
+song_topics %>% 
+  mutate(document = fct_reorder(document, gamma, function(x) -max(x))) %>% 
+  ggplot(aes(topic, gamma, fill = topic)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(vars(document)) +
+  labs(x = "Topic", y = expression(gamma))
+
+```
+
+```{r}
+
+effects <- estimateEffect(
+  1:4 ~ album_name,
+  topic_model,
+  metadata = tidy_lyrics %>%
+    distinct(song_name, album_name) %>%
+    arrange(song_name)
+)
+
+summary(effects)
+
+tidy(effects)
+
+```
+
