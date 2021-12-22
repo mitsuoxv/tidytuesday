@@ -161,8 +161,8 @@ diff_by_size <- starbucks3 %>%
     calories > 0
     ) %>% 
   mutate(calories_per_ml = calories / serv_size_m_l) %>% 
+  arrange(serv_size_m_l) %>%   
   group_by(product_name, milk, whip) %>% 
-  arrange(serv_size_m_l) %>% 
   summarize(
     range_calories_per_ml = first(calories_per_ml) - last(calories_per_ml),
     .groups = "drop"
