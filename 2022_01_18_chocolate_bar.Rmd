@@ -116,8 +116,7 @@ library(ggridges)
 draw_density <- function(df, var) {
   df %>% 
   ggplot(aes(rating, {{ var }}, fill = {{ var }})) +
-  geom_density_ridges(show.legend = FALSE) +
-  theme_ridges()
+  geom_density_ridges(show.legend = FALSE)
 }
 
 chocolate %>% 
@@ -241,6 +240,7 @@ p <- chocolate %>%
     ingredients = fct_reorder(ingredients, rating)
     ) %>% 
   draw_density(ingredients) +
+  
   labs(title = "Vanilla, sweetener and salt tend to\nlower rating",
        subtitle = "( ) denotes the number of chocolate bars",
        caption = "Source: Flavors of Cacao")
