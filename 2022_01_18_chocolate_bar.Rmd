@@ -1,0 +1,262 @@
+---
+title: "Chocolate bar ratings"
+date: 2022-01-18
+output: html_output
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+```
+
+# Load the weekly Data
+
+Dowload the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-01-18")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+chocolate <- tt$chocolate %>% 
+  mutate(
+    cocoa_percent = cocoa_percent %>% 
+      str_sub(end = -2L) %>% 
+      as.numeric()
+  ) %>% 
+  separate(ingredients, 
+           into = c("n_ingredients", "ingredients"),
+           sep = "-") %>% 
+  mutate(n_ingredients = as.numeric(n_ingredients)) %>% # max is 6
+  mutate(ingredients = str_trim(ingredients))
+
+```
+
+
+# Visualize
+
+ref is not unique. ref shows how new entry is.
+ref up to 600 tends to have lower rating with more variance. 
+
+```{r Visualize}
+
+dim(chocolate) # 2530 rows
+
+chocolate %>% 
+  count(ref, sort = TRUE)
+
+range(chocolate$ref)
+
+chocolate %>% 
+  ggplot(aes(ref)) +
+  geom_histogram(boundary = 0, binwidth = 100)
+
+summarize_rating <- function(df) {
+  df %>% 
+    summarize(
+    n = n(),
+    avg_rating = mean(rating),
+    median_rating = median(rating)
+    )
+}
+
+chocolate %>% 
+  mutate(ref = cut(ref, breaks = 0:14 * 200)) %>% 
+  group_by(ref) %>% 
+  summarize_rating()
+
+library(ggridges)
+
+draw_density <- function(df, var) {
+  df %>% 
+  ggplot(aes(rating, {{ var }}, fill = {{ var }})) +
+  geom_density_ridges(show.legend = FALSE) +
+  theme_ridges()
+}
+
+chocolate %>% 
+  mutate(ref = cut(ref, breaks = 0:14 * 200)) %>% 
+  draw_density(ref)
+  
+```
+
+review_date up to 2009 tends to be lower.
+
+```{r}
+
+range(chocolate$review_date)
+
+chocolate %>% 
+  ggplot(aes(rating, factor(review_date))) +
+  geom_boxplot()
+
+```
+
+Belgium tends to be lower.
+
+```{r}
+
+chocolate %>% 
+  count(company_manufacturer, sort = TRUE)
+
+chocolate %>% 
+  count(company_location, sort = TRUE)
+
+chocolate %>% 
+  mutate(
+    company_location = company_location %>% 
+      fct_lump_n(10) %>% 
+      fct_reorder(rating)
+    ) %>% 
+  draw_density(company_location)
+
+```
+
+Blend bean tends to be lower.
+
+```{r}
+
+chocolate %>% 
+  count(country_of_bean_origin, sort = TRUE)
+
+chocolate %>% 
+  mutate(
+    country_of_bean_origin = country_of_bean_origin %>% 
+      fct_lump_n(10) %>% 
+      fct_reorder(rating)
+    ) %>% 
+  draw_density(country_of_bean_origin)
+
+```
+
+cocoa_percent from 60 to 80 is most common and tends to have higher rating.
+
+```{r}
+
+chocolate %>% 
+  ggplot(aes(cocoa_percent, rating)) +
+  geom_point(alpha = 0.2)
+
+range(chocolate$cocoa_percent)
+
+chocolate %>% 
+  ggplot(aes(cocoa_percent)) +
+  geom_histogram(boundary = 40, binwidth = 5)
+
+chocolate %>% 
+  mutate(cocoa_percent = cut(cocoa_percent, breaks = 8:20 * 5)) %>% 
+  group_by(cocoa_percent) %>% 
+  summarize_rating()
+
+chocolate %>% 
+  mutate(cocoa_percent = cut(cocoa_percent, breaks = 10:20 * 5)) %>% 
+  filter(!is.na(cocoa_percent)) %>% 
+  draw_density(cocoa_percent)
+
+```
+
+n_ingredients from 2 to 3 is most common and tends to have higher rating.
+
+```{r}
+
+chocolate %>% 
+  group_by(n_ingredients) %>% 
+  summarize_rating()
+
+chocolate %>% 
+  ggplot(aes(factor(n_ingredients))) +
+  geom_bar()
+
+chocolate %>% 
+  ggplot(aes(factor(n_ingredients), rating)) +
+  geom_boxplot()
+
+```
+
+Beans, Sugar and Cocoa Butter are most common ingredients and tend to have high rating.
+
+```{r}
+
+chocolate %>% 
+  separate_rows(ingredients, sep = ",") %>% 
+  group_by(ingredients) %>% 
+  summarize_rating()
+
+p <- chocolate %>% 
+  filter(!is.na(ingredients)) %>% 
+  separate_rows(ingredients, sep = ",") %>% 
+  add_count(ingredients) %>% 
+  mutate(
+    ingredients = recode(ingredients, "B" = "Beans", "S" = "Sugar", 
+                         "S*" = "Sweetener other than\nwhite cane or beet sugar",
+                         "C" = "Cocoa Butter",
+                         "V" = "Vanilla", "L" = "Lecithin", "Sa" = "Salt"),
+    ingredients = glue::glue("{ingredients} ({n})"),
+    ingredients = fct_reorder(ingredients, rating)
+    ) %>% 
+  draw_density(ingredients) +
+  labs(title = "Vanilla, sweetener and salt tend to\nlower rating",
+       subtitle = "( ) denotes the number of chocolate bars",
+       caption = "Source: Flavors of Cacao")
+
+p
+
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/chocolate_bar.png", p, width = 6, height = 4)
+
+```
