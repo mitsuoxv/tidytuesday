@@ -249,7 +249,6 @@ p
 
 ```
 
-
 # Save Image
 
 Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
@@ -260,3 +259,25 @@ Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your p
 ggsave("image/chocolate_bar.png", p, width = 6, height = 4)
 
 ```
+
+# Try sankey diagram
+
+```{r}
+
+library(ggsankey)
+
+chocolate %>% 
+  mutate(
+    company_location = fct_lump_n(company_location, 5),
+    country_of_bean_origin = fct_lump_n(country_of_bean_origin, 5),
+    n_ingredients = factor(n_ingredients)
+  ) %>% 
+  make_long(company_location, country_of_bean_origin, n_ingredients) %>% 
+  ggplot(aes(x, node = node, next_x = next_x, next_node = next_node,
+             fill = factor(node), label = node)) +
+  geom_sankey(show.legend = FALSE) +
+  geom_sankey_label(show.legend = FALSE) +
+  theme_sankey()
+
+```
+
