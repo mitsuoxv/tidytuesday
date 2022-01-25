@@ -1,0 +1,304 @@
+---
+title: "Board games"
+date: 2022-01-25
+output: html_output
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Dowload the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-01-25")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+ratings <- tt$ratings
+details <- tt$details
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+Is the target "average" or "bayes_average"?
+
+```{r Visualize}
+
+ratings %>% 
+  ggplot(aes(average)) +
+  geom_histogram()
+
+ratings %>% 
+  ggplot(aes(bayes_average)) +
+  geom_histogram()
+
+ratings %>% 
+  ggplot(aes(users_rated)) +
+  geom_histogram() +
+  scale_x_log10()
+
+```
+
+Game rank is according to "bayes_average". So the target is likely to be "bayes_average", which tends to increase as "users_rated" increases.
+
+```{r}
+
+ratings %>% 
+  count(rank, sort = TRUE)
+
+ratings %>% 
+  ggplot(aes(rank, average)) +
+  geom_point(alpha = 0.2)
+
+ratings %>% 
+  ggplot(aes(rank, bayes_average)) +
+  geom_point(alpha = 0.2)
+
+ratings %>% 
+  ggplot(aes(users_rated, bayes_average)) +
+  geom_point(alpha = 0.2) +
+  scale_x_log10()
+```
+
+Game year doesn't mean much. "yearpublished" doesn't either.
+
+```{r}
+
+ratings %>% 
+  ggplot(aes(year, bayes_average)) +
+  geom_point(alpha = 0.2)
+
+rat_det <- ratings %>% 
+  left_join(details, by = "id")
+
+rat_det %>% 
+  ggplot(aes(yearpublished, bayes_average)) +
+  geom_point(alpha = 0.2)
+
+```
+
+```{r}
+
+rat_det %>% 
+  ggplot(aes(minplayers, bayes_average, group = minplayers)) +
+  geom_boxplot()
+
+rat_det %>% 
+  ggplot(aes(maxplayers, bayes_average, group = maxplayers)) +
+  geom_boxplot() +
+  scale_x_log10()
+
+```
+
+```{r}
+
+rat_det %>% 
+  ggplot(aes(playingtime, bayes_average)) +
+  geom_point(alpha = 0.2) +
+  scale_x_log10()
+
+rat_det %>% 
+  ggplot(aes(minplaytime, bayes_average)) +
+  geom_point(alpha = 0.2) +
+  scale_x_log10()
+
+rat_det %>% 
+  ggplot(aes(maxplaytime, bayes_average)) +
+  geom_point(alpha = 0.2) +
+  scale_x_log10()
+
+```
+
+```{r}
+rat_det %>% 
+  count(boardgamecategory, sort = TRUE)
+
+plot_cat <- function(df, var) {
+  df %>% 
+    filter(!is.na({{ var }})) %>% 
+  mutate({{ var }} := str_remove_all({{ var }}, "\\[|\\]|'|\\\"")) %>% 
+  separate_rows({{ var }}, sep = ", ") %>% 
+  mutate({{ var }} := fct_lump_n({{ var }}, n = 10)) %>% 
+  add_count({{ var }}) %>% 
+  mutate(
+    {{ var }} := paste0(as.character({{ var }}), " (", n, ")"),
+    {{ var }} := fct_reorder({{ var }}, bayes_average)
+  ) %>% 
+  ggplot(aes(bayes_average, {{ var }})) +
+  geom_boxplot()
+}
+
+rat_det %>% 
+  plot_cat(boardgamecategory)
+
+```
+
+```{r}
+rat_det %>% 
+  count(boardgamemechanic, sort = TRUE)
+
+rat_det %>% 
+  plot_cat(boardgamemechanic)
+
+```
+
+```{r}
+rat_det %>% 
+  count(boardgamefamily, sort = TRUE)
+
+```
+
+```{r}
+rat_det %>% 
+  count(boardgameexpansion, sort = TRUE)
+```
+
+```{r}
+rat_det %>% 
+  count(boardgameimplementation, sort = TRUE)
+```
+
+```{r}
+rat_det %>% 
+  count(boardgamedesigner, sort = TRUE)
+
+rat_det %>% 
+  plot_cat(boardgamedesigner)
+
+```
+
+```{r}
+rat_det %>% 
+  count(boardgameartist, sort = TRUE)
+
+rat_det %>% 
+  plot_cat(boardgameartist)
+```
+
+```{r}
+rat_det %>% 
+  count(boardgamepublisher, sort = TRUE)
+
+rat_det %>% 
+  plot_cat(boardgamepublisher)
+```
+
+
+```{r}
+rat_det %>% 
+  ggplot(aes(owned, bayes_average)) +
+  geom_point(alpha = 0.2) +
+  scale_x_log10()
+
+rat_det %>% 
+  ggplot(aes(trading, bayes_average)) +
+  geom_point(alpha = 0.2) +
+  scale_x_log10()
+
+rat_det %>% 
+  ggplot(aes(wanting, bayes_average)) +
+  geom_point(alpha = 0.2) +
+  scale_x_log10()
+
+rat_det %>% 
+  ggplot(aes(wishing, bayes_average)) +
+  geom_point(alpha = 0.2) +
+  scale_x_log10()
+
+```
+
+
+```{r}
+library(tidytext)
+
+tidy_desc <- details %>% 
+  unnest_tokens(word, description) %>% 
+  anti_join(get_stopwords()) %>% 
+  filter(str_detect(word, "^[:alpha:]"))
+
+tidy_desc %>% 
+  count(word, sort = TRUE)
+
+p <- tidy_desc %>% 
+  left_join(ratings, by = "id") %>% 
+  group_by(word) %>% 
+  summarize(
+    n = n(),
+    rating = mean(bayes_average)
+  ) %>% 
+  ggplot(aes(n, rating)) +
+  geom_hline(yintercept = mean(ratings$bayes_average), color = "blue") +
+  geom_text(aes(label = word), check_overlap = TRUE,
+            vjust = "top", hjust = "left") +
+  scale_x_log10(limits = c(3, 1e+02)) +
+  scale_y_continuous(limits = c(3, 9)) +
+  labs(x = "# of apperances in description", y = "Bayes average of ratings",
+       title = "'disguise', 'flocks' and 'bumped' tend to lower ratings,\nwhile common words coverge to the average rating",
+       subtitle = "Top-left of each word indicates rating\nBlue horizontal line is the average rating")
+
+p
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/board_games.png", p, width = 6, height = 4)
+
+```
