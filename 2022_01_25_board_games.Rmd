@@ -266,8 +266,8 @@ library(tidytext)
 
 tidy_desc <- details %>% 
   unnest_tokens(word, description) %>% 
-  anti_join(get_stopwords()) %>% 
-  filter(str_detect(word, "^[:alpha:]"))
+  anti_join(get_stopwords(), by = "word") %>% 
+  filter(str_detect(word, "^[:alpha:]+$"))
 
 tidy_desc %>% 
   count(word, sort = TRUE)
@@ -285,9 +285,10 @@ p <- tidy_desc %>%
             vjust = "top", hjust = "left") +
   scale_x_log10(limits = c(3, 1e+02)) +
   scale_y_continuous(limits = c(3, 9)) +
-  labs(x = "# of apperances in description", y = "Bayes average of ratings",
+  labs(x = "# of appearances in description", y = "Bayes average of ratings",
        title = "'disguise', 'flocks' and 'bumped' tend to lower ratings,\nwhile common words coverge to the average rating",
-       subtitle = "Top-left of each word indicates rating\nBlue horizontal line is the average rating")
+       subtitle = "Top-left of each word indicates rating\nBlue horizontal line is the average rating",
+       caption = "Source: Kaggle")
 
 p
 ```
@@ -299,6 +300,6 @@ Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your p
 ```{r}
 
 # This will save your most recent plot
-ggsave("image/board_games.png", p, width = 6, height = 4)
+ggsave("image/board_games.png", p, width = 6, height = 6)
 
 ```
