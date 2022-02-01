@@ -303,3 +303,140 @@ Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your p
 ggsave("image/board_games.png", p, width = 6, height = 6)
 
 ```
+
+# Imitate Julia Silge
+
+```{r}
+ratings_joined <- ratings %>% 
+  left_join(details, by = "id")
+
+ratings_joined %>% 
+  ggplot(aes(average)) +
+  geom_histogram()
+```
+
+```{r}
+ratings_joined %>% 
+  filter(!is.na(minage)) %>% 
+  mutate(minage = cut_number(minage, 4)) %>% 
+  ggplot(aes(minage, average, fill = minage)) +
+  geom_boxplot(show.legend = FALSE, alpha = 0.2)
+```
+
+## Build models
+
+Let's consider how to [spend our data budget](https://www.tmwr.org/splitting.html):
+
+- create training and testing sets
+- create resampling folds from the *training* set
+
+```{r}
+library(tidymodels)
+
+set.seed(123)
+game_split <- ratings_joined %>% 
+  select(name, average, starts_with(c("min", "max")), boardgamecategory) %>% 
+  na.omit() %>% 
+  initial_split(strata = average)
+game_train <- training(game_split)
+game_test <- testing(game_split)
+
+set.seed(234)
+game_folds <- vfold_cv(game_train, strata = average)
+game_folds
+```
+
+Let's create a recipe.
+
+```{r}
+library(textrecipes)
+
+split_category <- function(x) {
+  x %>% 
+    str_remove_all("[:punct:]") %>% 
+    str_trim() %>% 
+    str_squish() %>% 
+    str_to_lower() %>% 
+    str_replace_all(" ", "_") %>% 
+    str_split(", ")
+}
+
+game_rec <- recipe(average ~ ., data = game_train) %>% 
+  update_role(name, new_role = "id") %>% 
+  step_tokenize(boardgamecategory, custom_token = split_category) %>% 
+  step_tokenfilter(boardgamecategory, max_tokens = 30) %>% 
+  step_tf(boardgamecategory)
+
+game_rec %>% 
+  prep() %>% 
+  bake(new_data = NULL) %>% names()
+```
+
+Let's create a [**model specification**](https://www.tmwr.org/models.html) for each model we want to try:
+
+```{r}
+xgb_spec <-
+  boost_tree(
+    trees = tune(),
+    mtry = tune(),
+    min_n = tune(),
+    learn_rate = 0.01
+  ) %>% 
+  set_engine("xgboost") %>% 
+  set_mode("regression")
+
+xgb_wf <- workflow(game_rec, xgb_spec)
+xgb_wf
+```
+
+## Evaluate models
+
+These models have no tuning parameters so we can evaluate them as they are. [Learn about tuning hyperparameters here.](https://www.tidymodels.org/start/tuning/)
+
+```{r}
+library(finetune)
+doParallel::registerDoParallel(cores = 5)
+
+set.seed(234)
+xgb_game_rs <- tune_race_anova(
+  xgb_wf,
+  resamples = game_folds,
+  grid = 20,
+  control = control_race(verbose_elim = TRUE)
+)
+
+xgb_game_rs
+```
+
+```{r}
+plot_race(xgb_game_rs)
+```
+
+```{r}
+show_best(xgb_game_rs)
+```
+
+```{r}
+select_best(xgb_game_rs)
+```
+
+These models perform very similarly, so perhaps we would choose the simpler, linear model. The function `last_fit()` *fits* one final time on the training data and *evaluates* on the testing data. This is the first time we have used the testing data.
+
+```{r}
+xgb_last <- xgb_wf %>% 
+  finalize_workflow(select_best(xgb_game_rs)) %>% 
+  last_fit(game_split)
+
+xgb_last
+```
+
+```{r}
+library(vip)
+
+xgb_fit <- xgb_last %>% 
+  extract_fit_parsnip()
+
+vip(xgb_fit, geom = "point", num_features = 12)
+```
+
+Give up SHAP.
