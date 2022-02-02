@@ -117,7 +117,7 @@ ggsave("image/dog_breeds.png", p, width = 6, height = 4)
 # Try ggradar
 
 ```{r}
-remotes::install_github("ricardo-bion/ggradar")
+# remotes::install_github("ricardo-bion/ggradar")
 
 library(ggradar)
 
