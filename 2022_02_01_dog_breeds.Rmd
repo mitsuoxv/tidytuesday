@@ -151,3 +151,22 @@ breed_traits %>%
   facet_wrap(vars(Breed))
 ```
 
+# Try slope graph
+
+```{r}
+library(CGPfunctions)
+
+breed_rank_long %>% 
+  group_by(Breed) %>% 
+  mutate(latest_rank = last(rank)) %>% 
+  ungroup() %>% 
+  filter(latest_rank <= 10) %>% 
+  mutate(year = factor(year)) %>% 
+  newggslopegraph(year, rank, Breed,
+                  ReverseYAxis = TRUE) +
+  labs(title = "French Bulldogs has steadily climbed ranks since 2013",
+       subtitle = "Top 10 breeds in 2020",
+       x = "Year", y = "Rank",
+       caption = "Source: American Kennel Club")
+```
+
