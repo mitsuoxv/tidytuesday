@@ -1,0 +1,181 @@
+---
+title: "Tuskegee Airmen"
+date: 2022-02-08
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+library(lubridate)
+library(tsibble)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-02-08")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+airmen <- tt$airmen %>% 
+  mutate(
+    graduation_date = as.Date(graduation_date),
+    reported_lost_date = as.Date(reported_lost_date),
+    rank_at_graduation = case_when(
+      rank_at_graduation == "Capt" ~ "Captain",
+      rank_at_graduation %in% c("N/A", "Unk") ~ NA_character_,
+      TRUE ~ rank_at_graduation
+    )
+    ) %>% 
+  separate(class, c("class_type", "class_year", "class_id"), "-",
+           extra = "merge") %>% 
+  mutate(
+    class_type = if_else(class_type == "Unk", NA_character_, class_type),
+    pilot_type = if_else(pilot_type == "Liason pilot", "Liaison pilot", pilot_type)
+  )
+
+airmen %>% 
+  filter(class_type == "45") %>% 
+  select(starts_with("class_"), graduated_from)
+
+airmen <- airmen %>% 
+  filter(class_type == "45") %>% 
+  mutate(
+    class_type = "BI",
+    class_year = "45"
+  ) %>% 
+  bind_rows(airmen %>% filter(class_type != "45"))
+
+airmen <- airmen %>% 
+  mutate(class_year = as.numeric(class_year) + 1900)
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+skimr::skim(airmen)
+  
+```
+
+```{r}
+
+airmen %>% 
+  count(rank_at_graduation, sort = TRUE)
+
+airmen %>% 
+  count(graduated_from, sort = TRUE)
+
+airmen %>% 
+  count(graduated_from, class_type, sort = TRUE)
+
+airmen %>% 
+  count(class_year, sort = TRUE)
+
+airmen %>% 
+  count(class_id)
+
+```
+
+```{r}
+airmen %>% 
+  count(pilot_type, sort = TRUE)
+
+airmen %>% 
+  count(military_hometown_of_record, sort = TRUE)
+
+airmen %>% 
+  count(state, sort = TRUE)
+
+```
+
+class_year mostly matches grad_year, except 9 cases probably due to the end of the war
+
+```{r}
+
+airmen %>% 
+  mutate(grad_year = year(graduation_date)) %>% 
+  filter(class_year != grad_year) %>% 
+  select(class_year, grad_year, graduation_date)
+```
+
+```{r}
+
+p <- airmen %>% 
+  filter(!is.na(graduation_date)) %>% 
+  mutate(grad_quarter = yearquarter(graduation_date)) %>% 
+  count(pilot_type, grad_quarter) %>% 
+  ggplot(aes(grad_quarter, n, fill = pilot_type)) +
+  geom_col() +
+  scale_fill_brewer(palette = "Set2") +
+  labs(x = "Graduation date by quarter", y = "# of pilots",
+       fill = "Pilot type",
+       title = "Twin engine pilots begin to appear from 1943 Q4",
+       caption = "Source: Commemorative Airforce")
+
+p
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/tuskegee_airmen.png", p, width = 6, height = 4)
+
+```
