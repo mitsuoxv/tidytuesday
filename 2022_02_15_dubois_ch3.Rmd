@@ -1,0 +1,119 @@
+---
+title: "Dubois data portraits, 2022, challenge 3"
+date: 2022-02-15
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(maps)
+library(janitor)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+us_states <- map_data("state")
+head(us_states)
+
+black_pop <- read_csv("data/black_pop.csv") %>% 
+  clean_names()
+```
+
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+us_states %>% 
+  ggplot(aes(long, lat, group = group)) +
+  geom_polygon(color = "white") +
+  coord_map("polyconic") +
+  theme_void()
+
+black_pop2 <- black_pop %>% 
+  left_join(
+    tibble(
+      state = state.abb,
+      region = str_to_lower(state.name)
+    ), by = "state"
+  ) %>% 
+  mutate(
+    pop = parse_number(population),
+    pop = if_else(is.na(pop), 0, pop),
+    population = fct_reorder(population, pop)
+    )
+
+old_levels <- black_pop2$population %>% levels()
+new_levels <- c(old_levels[1:4], "100,000 - 200,000", old_levels[5:9])
+new_labels <- c(new_levels[1:9], "750,000 NEGROES AND OVER")
+
+black_pop3 <- black_pop2 %>% 
+  mutate(population = factor(population, 
+                             levels = new_levels,
+                             labels = new_labels,
+                             exclude = NULL))
+
+black_pop3$population %>% levels()
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+p <- us_states %>% 
+  inner_join(black_pop3, by = "region") %>% 
+  ggplot(aes(long, lat, group = group, fill = population)) +
+  geom_polygon(color = "gray50") +
+  coord_map("polyconic") +
+  scale_fill_manual(values = c(
+    "#d6c4b1", "#edb459", "#e5bfb3", "#ca0a30", "#d6bca3",
+    "#2c1f4b", "#74513a", "#ccbba9", "#ae9c8e", "#201e1a"),
+    limits = new_levels, labels = new_labels
+    ) +
+  guides(fill = guide_legend(title = NULL, ncol = 2, reverse = TRUE)) +
+  labs(title = "RELATIVE NEGRO POPULATION OF THE STATES OF THE\nUNITED STATES.") +
+  theme_void() +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(hjust = 0.5,
+                              margin = margin(b = 3, unit = "cm")),
+    plot.background = element_rect(fill = "#e2d0bf", color = NA),
+    legend.text = element_text(margin = margin(r = 1, unit = "cm")),
+    legend.key.size = unit(0.8, "cm")
+    )
+  
+p
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/dubois_ch3.png", p, width = 6, height = 8)
+
+```
