@@ -163,7 +163,10 @@ p <- freedom %>%
   pivot_wider(names_from = year, values_from = value) %>% 
   mutate(diff_05_20 = `2020` - `2005`) %>% 
   filter(!is.na(diff_05_20)) %>% 
-  mutate(country = fct_reorder(country, diff_05_20)) %>% 
+  mutate(
+    country = if_else(str_detect(country, "United Kingdom"), "United Kingdom", country),
+    country = fct_reorder(country, diff_05_20)
+         ) %>% 
   ggplot(aes(diff_05_20, country, fill = factor(diff_05_20))) +
   geom_point(shape = 21) +
   scale_x_continuous(breaks = -1:1) +
