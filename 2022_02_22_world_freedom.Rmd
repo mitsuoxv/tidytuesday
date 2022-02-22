@@ -1,0 +1,192 @@
+---
+title: "World Freedom Index"
+date: 2022-02-22
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+library(janitor)
+library(fpp3)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-02-22")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+freedom <- tt$freedom %>% 
+  clean_names() %>% 
+  pivot_longer(c(cl, pr)) %>% 
+  as_tsibble(key = c(country, name), index = year)
+
+freedom
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+freedom %>% 
+  distinct(country, region_name, is_ldc) %>% 
+  count(region_name, is_ldc)
+
+range(freedom$year)
+range(freedom$value)
+
+freedom %>% 
+  filter(is_ldc ==0, name == "cl") %>% 
+  index_by() %>% 
+  summarize(value = mean(value)) %>% 
+  autoplot(value)
+
+freedom %>% 
+  filter(name == "cl", is_ldc == 0) %>% 
+  aggregate_key(region_name / country, value = mean(value)) %>% 
+  filter(is_aggregated(country)) %>% 
+  autoplot(value) +
+  scale_color_brewer(palette = "Set1")
+
+freedom %>% 
+  filter(is_ldc ==0, name == "pr") %>% 
+  index_by() %>% 
+  summarize(value = mean(value)) %>% 
+  autoplot(value)
+
+freedom %>% 
+  filter(name == "pr", is_ldc == 0) %>% 
+  aggregate_key(region_name / country, value = mean(value)) %>% 
+  filter(is_aggregated(country)) %>% 
+  autoplot(value) +
+  scale_color_brewer(palette = "Set1")
+
+```
+
+```{r}
+library(ggridges)
+
+freedom %>% 
+  filter(name == "cl", is_ldc == 0) %>% 
+  as_tibble() %>% 
+  group_by(country, region_name, year5 = (year %/% 5) * 5) %>% 
+  summarize(value = mean(value), .groups = "drop") %>% 
+  ggplot(aes(value, year5, group = year5)) +
+  geom_density_ridges() +
+  facet_wrap(vars(region_name))
+
+freedom %>% 
+  filter(name == "pr", is_ldc == 0) %>% 
+  as_tibble() %>% 
+  group_by(country, region_name, year5 = (year %/% 5) * 5) %>% 
+  summarize(value = mean(value), .groups = "drop") %>% 
+  ggplot(aes(value, year5, group = year5)) +
+  geom_density_ridges() +
+  facet_wrap(vars(region_name))
+
+```
+
+```{r}
+freedom %>% 
+  filter(name == "cl", is_ldc == 0, year %in% c(2005, 2020)) %>% 
+  as_tibble() %>% 
+  pivot_wider(names_from = year, values_from = value) %>% 
+  mutate(diff_05_20 = `2020` - `2005`) %>% 
+  ggplot(aes(diff_05_20)) +
+  geom_histogram(binwidth = 1) +
+  facet_wrap(vars(region_name))
+
+freedom %>% 
+  filter(name == "cl", is_ldc == 0, year %in% c(2005, 2020)) %>% 
+  as_tibble() %>% 
+  pivot_wider(names_from = year, values_from = value) %>% 
+  mutate(diff_05_20 = `2020` - `2005`) %>% 
+  filter(diff_05_20 > 1) %>% 
+  arrange(region_name, country) %>% View()
+
+p <- freedom %>% 
+  filter(name == "pr", is_ldc == 0, year %in% c(2005, 2020)) %>% 
+  as_tibble() %>% 
+  pivot_wider(names_from = year, values_from = value) %>% 
+  mutate(diff_05_20 = `2020` - `2005`) %>% 
+  filter(!is.na(diff_05_20)) %>% 
+  mutate(country = fct_reorder(country, diff_05_20)) %>% 
+  ggplot(aes(diff_05_20, country, fill = factor(diff_05_20))) +
+  geom_point(shape = 21) +
+  scale_x_continuous(breaks = -1:1) +
+  scale_fill_manual(values = c("white", "white", "red")) +
+  facet_wrap(vars(region_name), scales = "free_y",
+             ncol = 2) +
+  labs(x = "Score (1-7) change from 2005 to 2020", y = NULL,
+       title = "Political rights deteriorate in many countries from 2005 to 2020",
+       subtitle = "Excluding least developed countries",
+       caption = "Source: UN and Freedom House") +
+  theme(legend.position = "none",
+        panel.grid.minor = element_blank())
+
+p
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/world_freedom.png", p, width = 8, height = 12)
+
+```
