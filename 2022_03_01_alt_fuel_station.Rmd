@@ -204,7 +204,7 @@ p <- tesla_by_state2 %>%
   scale_y_log10(labels = comma_format(accuracy = 1)) +
   expand_limits(x = 1, y = 1) +
   labs(x = "# of electric stations (log scale)",
-       y = "# of stations TESLA cars can fill\n(log scale)",
+       y = "# of stations with TESLA connector\n(log scale)",
        title = "California, New York, Florida and Texas lead\nin # of electric stations",
        subtitle = "Blue line is fitted linear line",
        caption = "Source: US DOT")
