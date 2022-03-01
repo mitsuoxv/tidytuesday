@@ -1,0 +1,224 @@
+---
+title: "Alternative Fuel Stations"
+date: 2022-03-01
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-03-01")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+stations <- tt$stations %>% 
+  janitor::clean_names()
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+dim(stations)
+
+range(stations$x)
+range(stations$longitude)
+
+range(stations$y)
+range(stations$latitude)
+
+sum(is.na(stations$latitude))
+
+stations %>% 
+  count(fuel_type_code, sort = TRUE)
+
+stations %>% 
+  count(city, sort = TRUE)
+
+stations %>% 
+  count(state, sort = TRUE)
+
+stations %>% 
+  count(country, sort = TRUE)
+
+stations %>% 
+  count(status_code, sort = TRUE)
+
+stations %>% 
+  count(access_code, sort = TRUE)
+
+stations %>% 
+  count(cards_accepted, sort = TRUE)
+
+stations %>% 
+  count(owner_type_code, sort = TRUE)
+
+```
+
+```{r}
+
+new_york_city <- stations %>% 
+  filter(city == "New York") %>% 
+  mutate(
+    fuel_type_code = recode(fuel_type_code,
+                            "CNG" = "Compressed\nNatural Gas",
+                            "ELEC" = "Electric")
+  )
+
+new_york_city %>% 
+  ggplot(aes(x, y, color = fuel_type_code)) +
+  geom_point()
+
+```
+
+```{r}
+library(ggmap)
+citation("ggmap")
+
+ny_map <- get_map(location = c(lon=-73.95, lat=40.8),
+                       zoom = 11,
+                       maptype = "roadmap")
+
+ggmap(ny_map)
+
+ggmap(ny_map,
+      base_layer = ggplot(new_york_city, aes(x, y, color = fuel_type_code))) +
+  geom_point(size = 1, alpha = 0.5) +
+  scale_color_brewer(palette = "Dark2") +
+  theme_void() +
+  labs(title = "Location of alternative fuel stations",
+       subtitle = "New York City",
+       color = "Fuel type",
+       caption = "Source: US DOT")
+
+```
+
+
+```{r}
+
+elec <- stations %>% 
+  filter(fuel_type_code == "ELEC")
+
+elec %>% 
+  count(ev_connector_types, sort = TRUE)
+
+tesla_by_state <- elec %>%
+  group_by(state) %>% 
+  summarize(
+    n_total = n(),
+    n_tesla = sum(str_detect(ev_connector_types, "TESLA"), na.rm = TRUE),
+    prop_tesla = n_tesla / n_total
+  ) %>% 
+  arrange(desc(prop_tesla))
+
+us_states <- map_data("state")
+
+us_states %>% 
+  ggplot(aes(long, lat, group = group)) +
+  geom_polygon(color = "white") +
+  coord_map("polyconic") +
+  theme_void()
+
+tesla_by_state2 <- tesla_by_state %>% 
+  left_join(
+    tibble(
+      state = state.abb,
+      region = str_to_lower(state.name)
+    ), by = "state"
+  )
+
+us_states %>% 
+  inner_join(tesla_by_state2, by = "region") %>% 
+  ggplot(aes(long, lat, group = group, fill = prop_tesla)) +
+  geom_polygon(color = "gray50") +
+  scale_fill_viridis_c() +
+  coord_map("polyconic") +
+  labs(fill = "Ratio of TESLA",
+       title = "TESLA ratios among electric stations by state") +
+  theme_void()
+
+library(ggrepel)
+
+p <- tesla_by_state2 %>% 
+  ggplot(aes(n_total, n_tesla)) +
+  geom_point() +
+  geom_text_repel(aes(label = state)) +
+  geom_smooth(method = "lm", se = FALSE) +
+  scale_x_log10(labels = comma_format(accuracy = 1)) +
+  scale_y_log10(labels = comma_format(accuracy = 1)) +
+  expand_limits(x = 1, y = 1) +
+  labs(x = "# of electric stations (log scale)",
+       y = "# of stations TESLA cars can fill\n(log scale)",
+       title = "California, New York, Florida and Texas lead\nin # of electric stations",
+       subtitle = "Blue line is fitted linear line",
+       caption = "Source: US DOT")
+
+p
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/alt_fuel_stations.png", width = 6, height = 6)
+
+```
