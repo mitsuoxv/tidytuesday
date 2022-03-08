@@ -1,0 +1,214 @@
+---
+title: "Erasmus student mobility"
+date: 2022-03-08
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+library(lubridate)
+
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-03-08")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+erasmus <- tt$erasmus %>% 
+  separate(project_reference,
+           c("project_year", "project_round", "national_agency",
+             "key_action_code", "project_number"),
+           sep = "-") %>% 
+  mutate(
+    across(project_year:project_round, as.integer),
+    across(mobility_start_month:mobility_end_month, ~ parse_date(paste0(.x, "-01")))
+  )
+
+skimr::skim(erasmus)
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+erasmus %>% 
+  count(project_year, project_round, wt = participants)
+
+erasmus %>% 
+  count(academic_year, wt = participants)
+
+erasmus %>% 
+  count(national_agency, wt = participants, sort = TRUE)
+
+erasmus %>% 
+  count(sending_country_code, wt = participants, sort = TRUE)
+
+erasmus %>% 
+  count(sending_organization, wt = participants, sort = TRUE)
+
+erasmus %>% 
+  count(sending_city, wt = participants, sort = TRUE)
+
+erasmus %>% 
+  count(receiving_country_code, wt = participants, sort = TRUE)
+
+erasmus %>% 
+  count(receiving_organization, wt = participants, sort = TRUE)
+
+erasmus %>% 
+  count(receiving_city, wt = participants, sort = TRUE)
+
+erasmus %>% 
+  count(project_number, wt = participants, sort = TRUE)
+
+```
+
+Every key action code is KA347.
+
+```{r}
+erasmus %>% 
+  count(key_action_code, wt = participants, sort = TRUE)
+
+erasmus %>% 
+  summarize(total_participants = sum(participants))
+```
+
+```{r}
+erasmus %>% 
+  count(activity_mob, wt = participants, sort = TRUE)
+
+erasmus %>% 
+  count(participant_nationality, wt = participants, sort = TRUE)
+
+erasmus %>% 
+  count(participant_gender, wt = participants, sort = TRUE)
+
+erasmus %>% 
+  count(special_needs, wt = participants, sort = TRUE)
+
+erasmus %>% 
+  count(fewer_opportunities, wt = participants, sort = TRUE)
+
+erasmus %>% 
+  count(mobility_start_month, fewer_opportunities, wt = participants) %>% 
+  ggplot(aes(mobility_start_month, n)) +
+  geom_col(aes(fill = fewer_opportunities),
+           position = "fill")
+
+```
+
+Every field of education, and every education level is unknown.
+Every participant profile is Learner.
+Every group leader is No.
+
+```{r}
+erasmus %>% 
+  count(field_of_education, wt = participants, sort = TRUE)
+
+erasmus %>% 
+  count(education_level, wt = participants, sort = TRUE)
+
+erasmus %>% 
+  count(participant_profile, wt = participants, sort = TRUE)
+
+erasmus %>% 
+  count(group_leader, wt = participants, sort = TRUE)
+
+```
+
+```{r}
+library(ggridges)
+
+p <- erasmus %>% 
+  filter(participant_age > 10, participant_age < 40) %>% 
+  mutate(
+    sending_country_code = countrycode::countrycode(sending_country_code,
+                         origin = "eurostat",
+                         destination = "country.name"),
+    sending_country_code = fct_lump_n(sending_country_code,
+                                           n = 10, w = participants)
+    ) %>% 
+  filter(sending_country_code != "Other") %>% 
+  add_count(sending_country_code, wt = participants) %>% 
+  mutate(
+    sending_country_code = glue::glue("{sending_country_code} ({n})"),
+    sending_country_code = fct_reorder(sending_country_code, participant_age)
+  ) %>% 
+  ggplot(aes(participant_age, sending_country_code, fill = sending_country_code)) +
+  geom_density_ridges(aes(height = after_stat(density), weight = participants),
+                      stat = "density",
+                      show.legend = FALSE) +
+  labs(x = "Ages of participants", y = "Top 10 sending countries",
+       title = "Age distribution by sending country",
+       subtitle = "() denotes # of participants in ERASMUS program",
+       caption = "Source: Data.Europe.eu")
+
+p
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/erasmus_students.png", p, width = 6, height = 8)
+
+```
