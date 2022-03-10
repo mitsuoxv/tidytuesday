@@ -194,7 +194,7 @@ p <- erasmus %>%
                       show.legend = FALSE) +
   labs(x = "Ages of participants", y = "Top 10 sending countries",
        title = "Age distribution by sending country",
-       subtitle = "() denotes # of participants in ERASMUS K347 program of\nkey action code 3 to support policy reform",
+       subtitle = "() denotes # of participants in ERASMUS KA347 program of\nkey action 3 to support policy reform",
        caption = "Source: Data.Europe.eu")
 
 p
