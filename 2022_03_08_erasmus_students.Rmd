@@ -22,8 +22,6 @@ library(tidytuesdayR)
 library(scales)
 theme_set(theme_light())
 
-library(lubridate)
-
 ```
 
 # Load the weekly Data
@@ -196,7 +194,7 @@ p <- erasmus %>%
                       show.legend = FALSE) +
   labs(x = "Ages of participants", y = "Top 10 sending countries",
        title = "Age distribution by sending country",
-       subtitle = "() denotes # of participants in ERASMUS program",
+       subtitle = "() denotes # of participants in ERASMUS K347 program of\nkey action code 3 to support policy reform",
        caption = "Source: Data.Europe.eu")
 
 p
