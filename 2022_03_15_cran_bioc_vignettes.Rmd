@@ -1,0 +1,206 @@
+---
+title: "CRAN/BIOC Vignettes"
+date: 2022-03-15
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+library(lubridate)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-03-15")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+bioc <- tt$bioc %>% 
+  arrange(package, date)
+
+cran_dttm_a <- tt$cran %>% 
+  filter(str_detect(date, "^[1-9]")) %>% 
+  slice(-58612) %>% 
+  separate(date, into = c("day", "time", "tz"), sep = " ") %>% 
+  filter(tz == "UTC") %>% 
+  unite(date, c(day, time), sep = " ") %>% 
+  mutate(date = parse_datetime(date, locale = locale(tz = "UTC"))) %>% 
+  select(-tz)
+
+cran_date_part1 <- cran_dttm_a %>% 
+  mutate(date = as.Date(date))
+
+cran_date_part2 <- tt$cran %>% 
+  filter(str_detect(date, "^[1-9]")) %>% 
+  slice(-58612) %>% 
+  separate(date, into = c("day", "time", "tz"), sep = " ") %>% 
+  filter(tz == "CDT") %>% 
+  mutate(day = as.Date(day) + days(1)) %>% 
+  rename(date = day) %>% 
+  select(-time, -tz)
+
+cran_date_part3 <- tt$cran %>% 
+  filter(str_detect(date, "^[1-9]")) %>% 
+  slice(58612) %>% 
+  mutate(date = as.Date(date))
+
+cran_date_part4 <- tt$cran %>% 
+  filter(str_detect(date, "^0")) %>% 
+  mutate(date = NA_Date_)
+
+cran_dttm_b <- tt$cran %>% 
+  filter(str_detect(date, "^[:alpha:]")) %>% 
+  separate(date, c("wday", "month", "day", "time", "year"), sep = " +") %>% 
+  mutate(
+    date = paste(month, day, year, time),
+    date = parse_datetime(date, "%b %d %Y %H:%M:%S")
+    ) %>% 
+  select(-wday, -month, -day, -time, -year)
+
+cran_date_part5 <- cran_dttm_b %>% 
+  mutate(date = as.Date(date))
+
+cran_date <- bind_rows(cran_date_part1, cran_date_part2, cran_date_part3,
+          cran_date_part4, cran_date_part5) %>% 
+  arrange(package, version)
+
+cran_dttm <- bind_rows(cran_dttm_a, cran_dttm_b) %>% 
+  arrange(package, version)
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+range(bioc$date)
+
+bioc_year <- bioc %>% 
+  mutate(year = year(date)) %>% 
+  group_by(year, package) %>% 
+  slice_tail(n = 1) %>% 
+  ungroup()
+
+draw_line_chart <- function(df) {
+  df %>% 
+    filter(year >= 2001, year <= 2020) %>% 
+    group_by(year) %>% 
+    summarize(
+      n = n(),
+      rnw = sum(rnw),
+      rmd = sum(rmd)
+    ) %>% 
+    pivot_longer(n:rmd) %>% 
+    mutate(name = recode(name,
+                         n = "Packages",
+                         rmd = "Rmd vignettes",
+                         rnw = "Rnw vignettes")) %>% 
+    ggplot(aes(year, value, color = name)) +
+    geom_line() +
+    scale_y_continuous(labels = comma,
+                       limits = c(0, 6000)) +
+    scale_color_brewer(palette = "Dark2") +
+    labs(x = "Year", y = NULL, color = "# of")
+}
+
+p1 <- bioc_year %>% 
+  draw_line_chart() +
+  labs(title = "BIOC", y = "Count")
+
+p1
+```
+
+```{r}
+
+range(cran_date$date, na.rm = TRUE)
+
+cran_year <- cran_date %>% 
+  mutate(year = year(date)) %>% 
+  group_by(year, package) %>% 
+  slice_tail(n = 1) %>% 
+  ungroup()
+
+p2 <- cran_year %>% 
+  draw_line_chart() +
+  labs(title = "CRAN")
+
+p2
+```
+
+```{r}
+
+library(patchwork)
+
+p <- p1 + p2 + 
+  plot_layout(ncol = 2, guides = "collect") +
+  plot_annotation(
+    title = "Rmd is replacing Rnw vignettes in both BIOC and CRAN",
+    caption = "Source: Robert Flight"
+  )
+
+p
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/vignettes.png", p, width = 6, height = 4)
+
+```
