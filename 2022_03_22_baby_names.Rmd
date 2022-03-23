@@ -1,0 +1,140 @@
+---
+title: "Baby names"
+date: 2022-03-23
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-03-22")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+babynames <- tt$babynames
+
+glimpse(babynames)
+
+skimr::skim(babynames)
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+range(babynames$year)
+
+babynames %>% 
+  count(sex, year, wt = prop)
+
+```
+
+```{r}
+
+library(pals)
+
+by_last_string <- babynames %>% 
+  mutate(last_string = name %>% 
+           str_to_lower() %>% 
+           str_sub(-1, -1)) %>% 
+  group_by(sex, year, last_string) %>% 
+  summarize(prop = sum(prop), .groups = "drop")
+
+by_last_string %>% 
+  count(last_string, wt = prop, sort = TRUE) %>% 
+  head(15) %>% 
+  ggplot(aes(last_string, n)) +
+  geom_col()
+
+last_string_15 <- by_last_string %>% 
+  count(last_string, wt = prop, sort = TRUE) %>% 
+  head(15) %>% 
+  pull(last_string)
+
+p <- by_last_string %>% 
+  filter(last_string %in% last_string_15) %>% 
+  complete(sex, year, last_string, fill = list(prop = 0)) %>% 
+  mutate(sex = factor(sex, levels = c("M", "F"),
+                      labels = c("Male", "Female"))) %>% 
+  ggplot(aes(year, prop, fill = last_string)) +
+  geom_area() +
+  scale_fill_manual(values = unname(watlington()),
+                    guide = guide_legend(ncol = 2)) +
+  scale_y_continuous(labels = percent) +
+  facet_wrap(vars(sex)) +
+  labs(x = "Year", y = "Proportion",
+       fill = "Last string of\nbaby names",
+       title = "If your first name ends with 'a', I guess you are female.",
+       caption = "Source: US babynames")
+
+p
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/baby_names.png", p, width = 6, height = 4)
+
+```
