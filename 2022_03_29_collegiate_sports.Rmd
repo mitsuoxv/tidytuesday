@@ -1,0 +1,305 @@
+---
+title: "Collegiate sports"
+date: 2022-03-29
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-03-29")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+sports <- tt$sports
+
+
+
+```
+
+year from 2015 to 2019.
+Why does 2019 have so many observations?
+Because only 2019 has more than 30 observations per unitid.
+
+```{r}
+
+range(sports$year)
+sports %>% 
+  count(year, sort = TRUE)
+
+sports %>% 
+  count(year, unitid, sort = TRUE) %>% 
+  ggplot(aes(n)) +
+  geom_histogram() +
+  facet_wrap(vars(year))
+
+```
+
+1497 uniids suddenly increased observations in 2019 by increased # of sports.
+
+```{r}
+
+unitid_2019_many <- sports %>% 
+  filter(year == 2019) %>% 
+  count(unitid) %>% 
+  filter(n > 30) %>% 
+  pull(unitid)
+
+length(unitid_2019_many)
+
+sports_unitid_2019_many <- sports %>% 
+  filter(unitid %in% unitid_2019_many)
+
+sports_unitid_2019_many %>% 
+  count(year, unitid, sort = TRUE) %>% 
+  ggplot(aes(n)) +
+  geom_histogram() +
+  facet_wrap(vars(year))
+
+sports_unitid_2019_many %>% 
+  filter(unitid == 100663, year == 2015) %>% 
+  pull(sports)
+
+sports_unitid_2019_many %>% 
+  filter(unitid == 100663, year == 2019) %>% 
+  pull(sports)
+
+sports %>% 
+#  filter(year != 2019) %>% 
+  count(year, sports, sort = TRUE) %>% 
+  group_by(sports) %>% 
+  summarize(mean_n = mean(n)) %>% 
+  arrange(desc(mean_n)) %>% View()
+
+```
+
+
+```{r}
+
+sports %>% 
+  filter(year != 2019) %>% 
+  count(year, city_txt, sort = TRUE)
+
+sports %>% 
+  filter(year != 2019) %>% 
+  count(year, state_cd, sort = TRUE)
+
+sports %>% 
+  filter(year != 2019) %>% 
+  count(year, zip_text, sort = TRUE)
+
+sports %>% 
+  filter(year != 2019) %>% 
+  count(year, classification_name, sort = TRUE)
+
+```
+
+sportscode is code for sports.
+
+```{r}
+
+sports %>% 
+  count(year, sector_name, sort = TRUE)
+
+sports %>% 
+  distinct(sector_name)
+
+sports %>% 
+  count(year, sportscode, sort = TRUE)
+
+sports %>% 
+  count(year, sports, sort = TRUE)
+
+```
+
+
+```{r}
+
+sports %>% 
+  filter(year == 2015) %>% 
+  ggplot(aes(ef_total_count)) +
+  geom_histogram() +
+  facet_wrap(vars(sports))
+
+sports %>% 
+  filter(year == 2015) %>% 
+  ggplot(aes(sum_partic_men)) +
+  geom_histogram() +
+  facet_wrap(vars(sports))
+
+```
+
+Football has twin peaks in profits, as classification_name NCAA Division I-FBS earns a lot.
+
+```{r}
+
+sports %>% 
+  filter(year == 2015) %>% 
+  mutate(total_profit_menwomen = total_rev_menwomen - total_exp_menwomen) %>% 
+  ggplot(aes(total_profit_menwomen)) +
+  geom_histogram() +
+  scale_x_log10() +
+  facet_wrap(vars(sports))
+
+sports %>% 
+  filter(sports == "Football") %>% 
+  mutate(total_profit_menwomen = total_rev_menwomen - total_exp_menwomen) %>% 
+  ggplot(aes(total_profit_menwomen)) +
+  geom_histogram() +
+  scale_x_log10() +
+  facet_wrap(vars(year))
+
+sports %>% 
+  filter(sports == "Football", year == 2015) %>% 
+  mutate(total_profit_menwomen = total_rev_menwomen - total_exp_menwomen) %>% 
+  ggplot(aes(total_profit_menwomen)) +
+  geom_histogram() +
+  scale_x_log10() +
+  facet_wrap(vars(classification_name))
+
+
+```
+
+classification_name NCAA Division I-FBS earns more also in basketball.
+
+```{r}
+
+sports %>% 
+  filter(sports == "Basketball") %>% 
+  mutate(total_profit_menwomen = total_rev_menwomen - total_exp_menwomen) %>% 
+  ggplot(aes(total_profit_menwomen)) +
+  geom_histogram() +
+  scale_x_log10() +
+  facet_wrap(vars(year))
+
+sports %>% 
+  filter(sports == "Basketball", year == 2015) %>% 
+  mutate(total_profit_menwomen = total_rev_menwomen - total_exp_menwomen) %>% 
+  ggplot(aes(total_profit_menwomen)) +
+  geom_histogram() +
+  scale_x_log10() +
+  facet_wrap(vars(classification_name))
+
+sports %>% 
+  distinct(classification_name)
+
+```
+
+
+```{r}
+
+sports %>% 
+  filter(institution_name == "New York University") %>% 
+  mutate(
+    total_profit_menwomen = total_rev_menwomen - total_exp_menwomen,
+    profitability_menwomen = total_profit_menwomen / total_rev_menwomen
+    ) %>% 
+  ggplot(aes(year, profitability_menwomen, color = sports)) +
+  geom_line()
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+popular_8_sports <- sports %>% 
+  filter(year == 2015) %>% 
+  count(sports, sort = TRUE) %>% 
+  head(8) %>% 
+  pull(sports)
+
+p <- sports %>% 
+  filter(
+    sports %in% popular_8_sports,
+    !is.na(total_rev_menwomen),
+    !is.na(total_exp_menwomen)
+  ) %>% 
+  mutate(total_profit_menwomen = total_rev_menwomen - total_exp_menwomen) %>% 
+  group_by(sports, year) %>% 
+  summarize(
+    profitability = sum(total_profit_menwomen, na.rm = TRUE) / sum(total_rev_menwomen, na.rm = TRUE),
+    .groups = "drop") %>% 
+  mutate(
+    sports = fct_reorder2(sports, year, profitability),
+    year = paste0(year, "-\n", year + 1) 
+    ) %>% 
+  ggplot(aes(year, profitability, color = sports, group = sports)) +
+  geom_line(size = 1) +
+  geom_hline(yintercept = 0, color = "gray70") +
+  scale_x_discrete(expand = c(0, 0)) +
+  scale_y_continuous(labels = percent) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(x = "Year", y = "Profit / Revenue", color = NULL,
+       title = "Only football managed to avoid profit deterioration\nin 2019-2020",
+       subtitle = "total of male and female",
+       caption = "Source: Equity in Athletics Data Analysis")
+  
+p
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/collegiate_sports.png", width = 6, height = 4)
+
+```
