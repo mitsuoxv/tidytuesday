@@ -1,0 +1,215 @@
+---
+title: "Digital publications"
+date: 2022-04-05
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+library(patchwork)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-04-05")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+news_orgs <- tt$news_orgs %>% 
+  mutate(across(c(total_employees, starts_with("budget_")),
+                ~ fct_reorder(.x, parse_number(.x))))
+
+skimr::skim(news_orgs)
+
+```
+
+```{r}
+
+news_orgs %>% 
+  count(is_owner_founder)
+
+news_orgs %>% 
+  count(country, state, city, sort = TRUE)
+
+news_orgs %>% 
+  count(primary_language, sort = TRUE)
+
+news_orgs %>% 
+  count(primary_language_other, sort = TRUE)
+```
+
+Ower-founder prefers not for profit.
+
+``` {r}
+news_orgs %>% 
+  count(tax_status_founded, sort = TRUE)
+
+news_orgs %>% 
+  count(tax_status_current, sort = TRUE)
+
+table(
+  news_orgs$is_owner_founder,
+  news_orgs$tax_status_current
+) %>% 
+  addmargins()
+```
+
+# Visualize
+
+Spanish appears after 2000s.
+
+```{r Visualize}
+
+range(news_orgs$year_founded, na.rm = TRUE)
+
+news_orgs %>% 
+  count(year_founded, primary_language) %>% 
+  ggplot(aes(year_founded, n, fill = primary_language)) +
+  geom_col()
+  
+```
+
+For most of for-profit news orgs, budget_percent_xxx is not available. I guess classification of tax status is diffrent between budget data is available (detailed) and not available (rough).
+Among available data, budget_percent_editorial distribution varies a lot.
+
+```{r}
+
+news_orgs %>% 
+  count(data_avail = !is.na(budget_percent_editorial), tax_status_current) %>% 
+  ggplot(aes(data_avail, n, fill = tax_status_current)) +
+  geom_col(position = "fill")
+
+news_orgs2 <- news_orgs %>% 
+  mutate(
+    tax_status_current2 = if_else(tax_status_current %in% c("For Profit",
+            "LLC", "Partnership", "S Corp", "Sole Proprietor/no specific tax status"), "For profit", "Not for profit"),
+    budget_percent_editorial = str_replace(budget_percent_editorial,
+                                           "-", "-\n"),
+    total_employees = total_employees %>% 
+      str_replace("-", "-\n") %>% 
+      str_replace("or ", "or\n"),
+    total_employees = fct_reorder(total_employees, parse_number(total_employees))
+  )
+
+news_orgs2 %>% 
+  count(data_avail = !is.na(budget_percent_editorial), tax_status_current2) %>% 
+  ggplot(aes(data_avail, n, fill = tax_status_current2)) +
+  geom_col(position = "fill")
+
+# maybe independent at 5 percent confidence level
+chisq.test(table(news_orgs2$is_owner_founder, news_orgs2$tax_status_current2))
+
+draw_budget_percent <- function(var1, var2, position) {
+  news_orgs2 %>% 
+    filter(!is.na({{ var1 }}), !is.na({{ var2 }})) %>% 
+    count({{ var1 }}, {{ var2 }}) %>% 
+    add_count({{ var2 }}, wt = n, name = "nn") %>% 
+    mutate(prop = n / nn) %>% 
+    ggplot(aes({{ var1 }}, prop, fill = {{ var2 }})) +
+    geom_col(position = position)
+}
+
+news_orgs2 %>% 
+  count(budget_percent_editorial, is_owner_founder) %>% 
+  add_count(is_owner_founder, wt = n) %>% 
+  mutate(prop = n / nn)
+
+draw_budget_percent(budget_percent_editorial, is_owner_founder, "dodge")
+draw_budget_percent(budget_percent_revenue_generation, is_owner_founder, "dodge")
+draw_budget_percent(budget_percent_product_technology, is_owner_founder, "dodge")
+draw_budget_percent(budget_percent_administration, is_owner_founder, "dodge")
+
+p1 <- draw_budget_percent(budget_percent_editorial, tax_status_current2, "dodge") +
+  scale_y_continuous(labels = percent, limits = c(0, 0.35)) +
+  labs(x = "Budget percent for editorial", y = "Proportion in each\ncurrent tax status") +
+  theme(legend.position = "none")
+draw_budget_percent(budget_percent_revenue_generation, tax_status_current2, "dodge")
+draw_budget_percent(budget_percent_product_technology, tax_status_current2, "dodge")
+draw_budget_percent(budget_percent_administration, tax_status_current2, "dodge")
+
+```
+
+Owner-founder tends to have fewer employees.
+
+``` {r}
+draw_budget_percent(total_employees, is_owner_founder, "dodge")
+
+p2 <- draw_budget_percent(total_employees, tax_status_current2, "dodge") +
+  scale_y_continuous(labels = percent, limits = c(0, 0.35)) +
+  labs(x = "# of employees", y = NULL, fill = "Current\ntax status")
+
+```
+
+```{r}
+p <- p1 + p2 +
+  plot_layout(ncol = 2) +
+  plot_annotation(
+    title = "For-profit digital news organizations tend to spend less on editorial,\nand to employ less",
+    caption = "Note: For-profit orgs are For Profit, LLC, Partnership, S Corp, and Sole Proprietor/no specific tax status.\nNot-for-profit orgs are others.\nSource: Project Oasis",
+    theme = theme(plot.caption = element_text(hjust = 0))
+  )
+
+p
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/digital_publications.png", p, height = 6, width = 8)
+
+```
