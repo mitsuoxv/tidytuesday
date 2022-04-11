@@ -373,11 +373,21 @@ account_for_sport <- lm(expenditure ~ participants + gender + sports,
 
 summary(ignore_sport)
 summary(account_for_sport)
+
 ```
 
 ```{r}
 
 library(broom)
+
+tidy(ignore_sport) %>% nrow() # 3
+tidy(account_for_sport) %>% nrow() # 33
+
+nrow(sports_selected) # 130748
+qt(0.025, df = 130748 - 3) # -1.96
+qt(0.025, df = 130748 - 33) # -1.96
+
+qnorm(0.025) # -1.96
 
 bind_rows(
   tidy(ignore_sport) %>% mutate(sport = "igonre"),
