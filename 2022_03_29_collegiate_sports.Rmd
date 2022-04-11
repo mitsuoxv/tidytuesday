@@ -303,3 +303,140 @@ Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your p
 ggsave("image/collegiate_sports.png", width = 6, height = 4)
 
 ```
+
+# Imitate Julia Silge
+
+```{r}
+
+unique(sports$sports)
+
+sports_parsed <- sports %>% 
+  mutate(sports = case_when(
+    str_detect(sports, "Swimming") ~ "Swimming and Diving",
+    str_detect(sports, "Diving") ~ "Swimming and Diving",
+    str_detect(sports, "Track") ~ "Track",
+    TRUE ~ sports
+  ))
+
+unique(sports_parsed$sports)
+```
+
+```{r}
+
+sports_parsed %>% names()
+
+sports_selected <- 
+  bind_rows(
+    sports_parsed %>% 
+  select(year, institution_name, sports,
+         participants = partic_men,
+         revenue = rev_men,
+         expenditure = exp_men) %>% 
+  mutate(gender = "men"),
+  sports_parsed %>% 
+  select(year, institution_name, sports,
+         participants = partic_women,
+         revenue = rev_women,
+         expenditure = exp_women) %>% 
+  mutate(gender = "women")
+  ) %>% 
+  na.omit()
+
+```
+
+```{r}
+
+sports_selected %>% 
+  mutate(sports = fct_reorder(sports, expenditure)) %>% 
+  ggplot(aes(expenditure, sports, fill = gender, color = gender)) +
+  geom_boxplot(alpha = 0.2,
+               position = position_dodge(preserve = "single")) +
+  scale_x_log10(labels = dollar) +
+  scale_fill_brewer(palette = "Dark2") +
+  scale_color_brewer(palette = "Dark2") +
+  theme(legend.position = "top") +
+  labs(x = "Expenditures per team", y = NULL, fill = NULL, color = NULL)
+```
+
+Build linear model
+
+```{r}
+
+ignore_sport <- lm(expenditure ~ participants + gender,
+                   data = sports_selected)
+
+account_for_sport <- lm(expenditure ~ participants + gender + sports,
+                        data = sports_selected)
+```
+
+```{r}
+
+summary(ignore_sport)
+summary(account_for_sport)
+```
+
+```{r}
+
+library(broom)
+
+bind_rows(
+  tidy(ignore_sport) %>% mutate(sport = "igonre"),
+  tidy(account_for_sport) %>% mutate(sport = "account for sport")
+) %>% 
+  filter(term != "(Intercept)", !str_detect(term, "sports")) %>% 
+  ggplot(aes(estimate, term, color = sport)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(xmin = estimate - 1.96 * std.error,
+                    xmax = estimate + 1.96 * std.error),
+                width = 0.5) +
+  geom_vline(xintercept = 0, lty = 2, color = "gray50") +
+  scale_x_continuous(labels = dollar) +
+  theme(legend.position = "bottom") +
+  labs(x = "Change in expenditures", y = NULL,
+       color = "Include sport in model?")
+
+```
+
+Bootstrap intervals
+
+```{r}
+library(rsample)
+```
+
+```{r}
+
+set.seed(123)
+ignore_sport_intervals <- reg_intervals(expenditure ~ participants + gender,
+                   data = sports_selected, times = 500)
+
+set.seed(123)
+account_for_sport_intervals <- reg_intervals(expenditure ~ participants + gender + sports,
+                        data = sports_selected, times = 500)
+```
+
+```{r}
+
+account_for_sport_intervals %>% 
+  filter(str_detect(term, "sports")) %>% 
+  arrange(desc(.estimate))
+```
+
+```{r}
+
+bind_rows(
+  ignore_sport_intervals %>% mutate(sport = "igonre"),
+  account_for_sport_intervals %>% mutate(sport = "account for sport")
+) %>% 
+  filter(term != "(Intercept)", !str_detect(term, "sports")) %>% 
+  ggplot(aes(.estimate, term, color = sport)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(xmin = .lower,
+                    xmax = .upper),
+                width = 0.5) +
+  geom_vline(xintercept = 0, lty = 2, color = "gray50") +
+  scale_x_continuous(labels = dollar) +
+  theme(legend.position = "bottom") +
+  labs(x = "Change in expenditures", y = NULL,
+       color = "Include sport in model?")
+```
+
