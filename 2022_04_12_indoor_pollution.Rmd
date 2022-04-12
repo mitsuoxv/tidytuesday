@@ -1,0 +1,253 @@
+---
+title: "Indoor pollution"
+date: 2022-04-12
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+library(countrycode)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-04-12")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+fuel_gdp <- tt$fuel_gdp %>% 
+  setNames(c("entity", "code", "year", "access",
+             "gdp_per_capita", "population", "continent"))
+
+fuel_access <- tt$fuel_access %>% 
+  setNames(c("entity", "code", "year", "access"))
+
+death_source <- tt$death_source %>% 
+  setNames(c("entity", "code", "year", "deaths"))
+
+death_fuel <- tt$death_fuel %>% 
+  setNames(c("entity", "code", "year", "deaths", "deaths_latest", "year_latest", "continent"))
+
+death_timeseries <- tt$death_timeseries %>% 
+  setNames(c("entity", "code", "year", "deaths", "deaths_latest", "year_latest", "continent"))
+```
+
+Discard "death_timeseries", as it looks same as "death_fuel".
+
+```{r}
+dim(death_fuel)
+dim(death_timeseries)
+identical(death_fuel, death_timeseries) # FALSE
+
+skimr::skim(death_fuel)
+skimr::skim(death_timeseries) # But, looks same
+```
+
+Discard deaths_latest and year_latest columns in "death_fuel", as they are included in "deaths" and "year" columns.
+
+```{r}
+death_fuel %>% 
+  filter(year == 2019) %>% 
+  mutate(diff = deaths - deaths_latest) %>% 
+  filter(diff != 0) # deaths of 2019 == deaths_latest
+
+death_fuel <- death_fuel %>% 
+  select(entity:deaths, continent)
+```
+
+```{r}
+indoor_pollution <- tt$indoor_pollution %>% 
+  setNames(c("entity", "code", "year", "deaths"))
+
+identical(death_source, indoor_pollution) # FALSE
+
+# 3 different deaths
+
+death_fuel %>% 
+  ggplot(aes(deaths)) + # absolute counts?
+  geom_histogram() +
+  scale_x_log10()
+
+indoor_pollution %>% 
+  ggplot(aes(deaths)) + # percent?
+  geom_histogram() +
+  scale_x_log10()
+
+death_source %>% 
+  ggplot(aes(deaths)) + # per 100,000
+  geom_histogram() +
+  scale_x_log10()
+
+# 3 different deaths have slightly different curve
+
+death_fuel %>% 
+  filter(entity == "Afghanistan") %>% 
+  ggplot(aes(year, deaths)) +
+  geom_line() +
+  expand_limits(y = 0)
+
+indoor_pollution %>% 
+  filter(entity == "Afghanistan") %>% 
+  ggplot(aes(year, deaths)) +
+  geom_line() +
+  expand_limits(y = 0)
+
+death_source %>% 
+  filter(entity == "Afghanistan") %>% 
+  ggplot(aes(year, deaths)) +
+  geom_line() +
+  expand_limits(y = 0)
+
+death_fuel <- death_fuel %>% 
+  rename(deaths1 = deaths)
+indoor_pollution <- indoor_pollution %>% 
+  rename(deaths2 = deaths)
+death_source <- death_source %>% 
+  rename(deaths3 = deaths)
+```
+
+Discard "fuel_access" as "fuel_gdp" includes it.
+
+```{r}
+
+fuel_gdp %>% 
+  filter(!is.na(access)) %>% 
+  nrow()
+
+fuel_access %>% 
+  filter(!is.na(access)) %>% 
+  nrow()
+```
+
+
+```{r}
+
+glimpse(fuel_gdp)
+glimpse(death_fuel)
+glimpse(death_source)
+glimpse(indoor_pollution)
+
+death_fuel %>% 
+  count(entity, year, sort = TRUE)
+
+fuel_gdp2 <- fuel_gdp %>% 
+  left_join(death_fuel %>% select(-code, -continent), by = c("entity", "year"))
+
+fuel_gdp3 <- fuel_gdp2 %>% 
+  left_join(death_source %>% select(-code), by = c("entity", "year"))
+
+fuel_gdp4 <- fuel_gdp3 %>% 
+  left_join(indoor_pollution %>% select(-code), by = c("entity", "year"))
+
+fuel_gdp5 <- fuel_gdp4 %>% 
+  mutate(continent2 = countrycode(sourcevar = code, 
+                                  origin = "iso3c",
+                                  destination = "continent")) %>% 
+  filter(!is.na(continent2))
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+Population from BC10000.
+
+```{r Visualize}
+
+fuel_gdp5 %>% 
+  ggplot(aes(year, population, group = entity)) +
+  geom_line(color = "gray70") +
+  scale_y_log10() +
+  facet_wrap(vars(continent2))
+
+```
+
+```{r}
+
+library(ggrepel)
+
+fuel_gdp_2000 <- fuel_gdp5 %>% 
+  filter(!is.na(access))
+
+fuel_gdp_2016 <- fuel_gdp_2000 %>% 
+  group_by(entity) %>% 
+  slice_max(year)
+  ungroup()
+
+p <- fuel_gdp_2000 %>% 
+  ggplot(aes(access, deaths3)) +
+  geom_point(aes(color = year)) +
+  geom_line(aes(group = entity)) +
+  geom_text_repel(aes(label = entity), data = fuel_gdp_2016) +
+  guides(color = guide_colorbar(reverse = TRUE)) +
+  facet_wrap(vars(continent2)) +
+  labs(x = "Access to clean fuels, % of population",
+       y = "# of deaths per 100,000\ncaused by indoor air pollution",
+       title = "Improvement in access to clean fuels is reducing deaths from indoor air pollution",
+       subtitle = "No longer an issue in Europe",
+       caption = "Source: OurWorldInData.org")
+
+p
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/indoor_air_pollution.png", width = 10, height = 8)
+
+```
