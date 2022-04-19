@@ -1,0 +1,221 @@
+---
+title: "Crossword puzzles and clues"
+date: 2022-04-19
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+library(ggrepel)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-04-19")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+tt$big_dave %>% 
+  filter(is.na(answer)) %>% View()
+
+big_dave <- tt$big_dave %>% 
+  filter(!is.na(answer)) %>% 
+  mutate(
+    n_letters = nchar(answer),
+    clue_temp = clue %>% 
+      str_match("\\(([\\d,-’\\s]+)\\)"),
+    clue_num = clue_temp[, 2] %>% 
+      str_replace_all("-", ","),
+    puzzle_name_temp = puzzle_name %>% 
+      str_to_lower() %>% 
+      str_match("^(\\D*)([\\d|,]*)$"),
+    puzzle_name_source = puzzle_name_temp[, 2] %>% 
+      str_trim() %>% 
+      str_remove(" –|-| no$"),
+    puzzle_name_id = puzzle_name_temp[, 3]
+  ) %>% 
+  select(-clue_temp, -puzzle_name_temp)
+
+big_dave %>% 
+  count(puzzle_name_source, sort = TRUE)
+
+tt$times %>% 
+  filter(is.na(answer)) %>% View()
+
+times <- tt$times %>% 
+  filter(!is.na(answer)) %>% 
+  mutate(
+    n_letters = nchar(answer),
+    clue_temp = clue %>% 
+      str_match("\\(([\\d,-’\\s]+)\\)"),
+    clue_num = clue_temp[, 2] %>% 
+      str_replace_all("-", ","),
+    puzzle_name_temp = puzzle_name %>% 
+      str_to_lower() %>% 
+      str_match("^(\\D*)([\\d|,]*)$"),
+    puzzle_name_source = puzzle_name_temp[, 2] %>% 
+      str_trim() %>% 
+      str_remove(" no$"),
+    puzzle_name_id = puzzle_name_temp[, 3]
+  ) %>% 
+  select(-clue_temp, -puzzle_name_temp) %>% 
+  mutate(
+    puzzle_name_source = case_when(
+      puzzle_name_source %in% c("times quick cryptic", "quick cryptic", "qc") ~ "times quick cryptic",
+      puzzle_name_source %in% c("times cryptic jumbo", "jumbo") ~ "times cryptic jumbo",
+      puzzle_name_source %in% c("saturday times", "times saturday") ~ "saturday times",
+      TRUE ~ puzzle_name_source
+    )
+  )
+
+times %>% 
+  filter(is.na(puzzle_name_id))
+
+times %>% 
+  count(puzzle_name_source, sort = TRUE)
+
+combo <- bind_rows(
+  big_dave %>% mutate(source_class = "big_dave"),
+  times %>% mutate(source_class = "times")
+) 
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+Single-word answer.
+
+Maybe "cryptic" is British style, while "non-cryptic" is American style.
+
+```{r Visualize}
+
+combo_single_word <- combo %>% 
+  filter(!str_detect(answer, "[:blank:]|-"))
+
+combo_single_word %>% 
+  ggplot(aes(n_letters)) +
+  geom_histogram() +
+  facet_wrap(vars(source_class), ncol = 1)
+
+combo_single_word %>% 
+  count(puzzle_name_source, sort = TRUE)
+
+large_sources <- combo_single_word %>% 
+  count(puzzle_name_source) %>% 
+  slice_max(n, n = 8) %>% 
+  pull(puzzle_name_source)
+
+combo_single_word %>% 
+  filter(puzzle_name_source %in% large_sources) %>% 
+    group_by(puzzle_name_source) %>% 
+  mutate(n_letters_mean = mean(n_letters)) %>% 
+  ungroup() %>% 
+    mutate(puzzle_name_source = puzzle_name_source %>% 
+           fct_reorder(n_letters_mean) %>% 
+           fct_rev()) %>% 
+  ggplot(aes(n_letters)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 boundary = 0, binwidth = 1, color = "white") +
+  geom_vline(aes(xintercept = n_letters_mean), lty = 2) +
+  facet_wrap(vars(puzzle_name_source), ncol = 1,
+             strip.position = "left")
+```
+
+```{r}
+
+combo_single_word %>% 
+  filter(n_letters > 15) %>% 
+  pull(answer)
+
+plot_data <- combo_single_word %>% 
+  filter(puzzle_name_source %in% large_sources) %>% 
+  add_count(puzzle_name_source) %>% 
+  mutate(
+    puzzle_name_source = glue::glue("{puzzle_name_source}\n({n})"),
+    puzzle_name_source = puzzle_name_source %>% 
+      str_to_title() %>% 
+      fct_reorder(n_letters, mean)
+  )
+
+p <- plot_data %>% 
+  ggplot(aes(puzzle_name_source, n_letters, fill = puzzle_name_source)) +
+  geom_boxplot(outlier.alpha = 0.1) +
+  geom_text_repel(aes(label = answer),
+                  data = plot_data %>% 
+                    filter(n_letters >= 18) %>% 
+                    mutate(answer = str_to_title(answer)),
+                           size = 3
+  ) +
+  guides(fill = "none") +
+  scale_x_discrete(labels = wrap_format(10)) +
+  labs(x = "Puzzle Name", y = "# of letters of single-word answers",
+       title = "Times Cryptic Jumbo is indeed jumbo,\nand Times Quick Cryptic is indeed quick",
+       subtitle = "( ) denotes # of single-word answers",
+       caption = "Source: cryptics.georgeho.org")
+
+p
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/crossword_puzzles.png", p, width = 6, height = 6)
+
+```
