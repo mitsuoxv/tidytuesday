@@ -200,7 +200,7 @@ p <- plot_data %>%
   ) +
   guides(fill = "none") +
   scale_x_discrete(labels = wrap_format(10)) +
-  labs(x = "Puzzle Name", y = "# of letters of single-word answers",
+  labs(x = "Puzzle Name", y = "# of letters in single-word answers",
        title = "Times Cryptic Jumbo is indeed jumbo,\nand Times Quick Cryptic is indeed quick",
        subtitle = "( ) denotes # of single-word answers",
        caption = "Source: cryptics.georgeho.org")
