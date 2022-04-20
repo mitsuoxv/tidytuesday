@@ -70,22 +70,22 @@ tt$big_dave %>%
 
 big_dave <- tt$big_dave %>% 
   filter(!is.na(answer)) %>% 
+  extract(clue, c("clue_sentence", "clue_num"),
+          "^(.+)\\((\\d[\\d,’\\-\\s]*)\\)?.*$",
+          remove = FALSE) %>% 
+  extract(puzzle_name, c("puzzle_name_source", "puzzle_name_id"),
+          "^(\\D*)([\\d|,]*)$") %>% 
   mutate(
-    n_letters = nchar(answer),
-    clue_temp = clue %>% 
-      str_match("\\(([\\d,-’\\s]+)\\)"),
-    clue_num = clue_temp[, 2] %>% 
-      str_replace_all("-", ","),
-    puzzle_name_temp = puzzle_name %>% 
+    clue_sentence = if_else(is.na(clue_sentence), clue, clue_sentence),
+    clue_num = str_replace_all(clue_num, "-", ","),
+    puzzle_name_source = puzzle_name_source %>% 
       str_to_lower() %>% 
-      str_match("^(\\D*)([\\d|,]*)$"),
-    puzzle_name_source = puzzle_name_temp[, 2] %>% 
       str_trim() %>% 
       str_remove(" –|-| no$"),
-    puzzle_name_id = puzzle_name_temp[, 3]
+    n_letters = nchar(answer)
   ) %>% 
-  select(-clue_temp, -puzzle_name_temp)
-
+  select(-clue)
+    
 big_dave %>% 
   count(puzzle_name_source, sort = TRUE)
 
@@ -94,32 +94,30 @@ tt$times %>%
 
 times <- tt$times %>% 
   filter(!is.na(answer)) %>% 
+  extract(clue, c("clue_sentence", "clue_num"),
+          "^(.+)\\((\\d[\\d,’\\-\\s]*)\\)?.*$",
+          remove = FALSE) %>% 
+  extract(puzzle_name, c("puzzle_name_source", "puzzle_name_id"),
+          "^(\\D*)([\\d|,]*)$") %>% 
   mutate(
-    n_letters = nchar(answer),
-    clue_temp = clue %>% 
-      str_match("\\(([\\d,-’\\s]+)\\)"),
-    clue_num = clue_temp[, 2] %>% 
-      str_replace_all("-", ","),
-    puzzle_name_temp = puzzle_name %>% 
+    clue_sentence = if_else(is.na(clue_sentence), clue, clue_sentence),
+    clue_num = str_replace_all(clue_num, "-", ","),
+    puzzle_name_source = puzzle_name_source %>% 
       str_to_lower() %>% 
-      str_match("^(\\D*)([\\d|,]*)$"),
-    puzzle_name_source = puzzle_name_temp[, 2] %>% 
       str_trim() %>% 
-      str_remove(" no$"),
-    puzzle_name_id = puzzle_name_temp[, 3]
-  ) %>% 
-  select(-clue_temp, -puzzle_name_temp) %>% 
-  mutate(
-    puzzle_name_source = case_when(
+      str_remove(" –|-| no$"),
+        puzzle_name_source = case_when(
       puzzle_name_source %in% c("times quick cryptic", "quick cryptic", "qc") ~ "times quick cryptic",
       puzzle_name_source %in% c("times cryptic jumbo", "jumbo") ~ "times cryptic jumbo",
       puzzle_name_source %in% c("saturday times", "times saturday") ~ "saturday times",
       TRUE ~ puzzle_name_source
-    )
-  )
+    ),
+    n_letters = nchar(answer)
+  ) %>% 
+  select(-clue)
 
 times %>% 
-  filter(is.na(puzzle_name_id))
+  filter(is.na(clue_num)) %>% View()
 
 times %>% 
   count(puzzle_name_source, sort = TRUE)
