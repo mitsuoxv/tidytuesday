@@ -1,0 +1,148 @@
+---
+title: "Kaggle Hidden Gems"
+date: 2022-04-26
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+library(ggrepel)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-04-26")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+hidden_gems <- tt$hidden_gems
+
+skimr::skim(hidden_gems)
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+author_names <- hidden_gems %>% 
+  select(starts_with("author_")) %>% 
+  extract(author_twitter, "author_twitter", "([[:alnum:]_\\-]+$)") %>% 
+  extract(author_linkedin, "author_linkedin", "([[:alnum:]_\\-]+)/?$") %>% 
+  distinct(author_kaggle, .keep_all = TRUE)
+
+author_names <- author_names %>% 
+  mutate(author_linkedin = str_remove(author_linkedin, "\\-[[:digit:]ab]+$"))
+
+author_names %>% 
+  summarize(across(everything(), ~ sum(is.na(.x))))
+
+author_name_lengths <- author_names %>% 
+  pivot_longer(everything(), names_to = "sns", values_to = "name") %>% 
+  mutate(name_length = name %>% 
+           str_remove_all("\\s|_|\\-") %>% 
+           str_length()
+  ) %>% 
+  group_by(sns) %>% 
+  mutate(
+    n = sum(!is.na(name_length)),
+    mean_length = mean(name_length, na.rm = TRUE)
+  ) %>% 
+  ungroup()
+
+author_name_lengths %>% 
+  mutate(sns = fct_reorder(sns, mean_length)) %>% 
+  ggplot(aes(name_length)) +
+  geom_histogram(binwidth = 1, color = "white") +
+  geom_vline(aes(xintercept = mean_length), lty = 2) +
+  facet_wrap(vars(sns), ncol = 1)
+
+plot_data <- author_name_lengths %>% 
+  mutate(
+    sns = recode(sns,
+                  "author_kaggle" = "Kaggle",
+                  "author_twitter" = "Twitter",
+                  "author_name" = "Registered name\nin Kaggle",
+                  "author_linkedin" = "LinkedIn"
+                  ),
+    sns = glue::glue("{sns}\n({n})"),
+    sns = fct_reorder(sns, mean_length)
+    ) 
+
+p <- plot_data %>% 
+  ggplot(aes(sns, name_length, fill = sns)) +
+  geom_boxplot() +
+  geom_text_repel(aes(label = name), size = 3, data = plot_data %>% 
+              filter(name_length >= 20, str_detect(sns, "^Kaggle|^LinkedIn"))) +
+  guides(fill = "none") +
+  labs(x = NULL, y = "Name lengths\nexcluding space, underscore and minus",
+       title = "Name lengths in Kaggle Hidden Gems authors:\nKaggle < Twitter < Real name < LinkedIn",
+       subtitle = "( ) denotes # of authors",
+       caption = "Source: Kaggle")
+
+p
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/kaggle_hidden_gems.png", p, width = 6, height = 6)
+
+```
