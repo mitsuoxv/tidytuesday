@@ -108,3 +108,54 @@ Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your p
 ggsave("image/nyt_best_sellers.png", p, width = 8, height = 5)
 
 ```
+
+# Imitate @leeolney3
+
+Maybe I should learn {gt}.
+
+```{r}
+library(gt)
+library(gtExtras)
+```
+
+```{r}
+
+timeline_by_title <- nyt_full %>% 
+  mutate(rank = -rank) %>% 
+  group_by(title_id) %>% 
+  arrange(week) %>% 
+  summarize(timeline = list(rank), .groups = "drop")
+
+nyt_titles %>% 
+  slice_max(total_weeks, n = 20) %>% 
+  mutate(title = str_to_title(title)) %>% 
+  inner_join(timeline_by_title, by = c("id" = "title_id")) %>% 
+  select(-id) %>% 
+  mutate(wk = total_weeks) %>% 
+  relocate(wk, .after = total_weeks) %>% 
+  gt() %>% 
+  gt_theme_nytimes() %>% 
+  gt_sparkline(timeline, label = FALSE) %>% 
+  gt_plt_bar_pct(wk) %>% 
+  cols_width(
+    wk ~ px(100),
+    first_week ~ px(100)
+    ) %>% 
+  cols_align("right", first_week) %>% 
+  cols_label(
+    total_weeks = "total weeks",
+    first_week = "first week",
+    debut_rank = "debut rank",
+    best_rank = "best rank",
+    wk = ""
+    ) %>% 
+  tab_header(title = "NY Times best sellers",
+             subtitle = "List of titles with equal to or more than 80 weeks") %>% 
+  tab_source_note("Source: Post45 Data") %>% 
+  tab_style(
+    style = list(cell_text(style = "italic", color = "black")),
+    locations = cells_body(columns = title)
+  )
+
+```
+
