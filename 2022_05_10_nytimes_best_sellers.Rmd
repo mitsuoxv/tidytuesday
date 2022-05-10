@@ -1,0 +1,110 @@
+---
+title: "NYTimes best sellers"
+date: 2022-05-10
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+library(ggrepel)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in two objects.
+
+```{r Load}
+
+nyt_titles <- read_tsv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-05-10/nyt_titles.tsv')
+nyt_full <- read_tsv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-05-10/nyt_full.tsv')
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+list(nyt_titles, nyt_full) %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+nyt_titles$year %>% range()
+
+nyt_titles %>% 
+  count(year)
+
+nyt_titles %>% 
+  mutate(decade = (year %/% 10) * 10) %>% 
+  count(decade)
+
+nyt_titles_by_decade <- nyt_titles %>% 
+  mutate(
+    decade = (year %/% 10) * 10,
+    title = str_to_title(title)
+    ) %>% 
+  add_count(decade)%>% 
+  mutate(decade = glue::glue("{decade}s\n({n})"))
+
+p <- nyt_titles_by_decade %>% 
+  ggplot(aes(decade, total_weeks)) +
+  geom_boxplot() +
+  geom_text_repel(aes(label = title), size = 3, 
+                  data = nyt_titles_by_decade %>% 
+              filter(total_weeks > 150)) +
+  scale_y_log10() +
+  labs(x = "Decade (first listed in NYT best sellers)",
+       y = "Total # of weeks in list\n(log scale)",
+       title = "Best sellers' staying weeks got longer from 1930s up to 1970s,\nand have got shorter since then, except some long-lived titles",
+       subtitle = "(#) denotes # of titles",
+       caption = "Source: Post45 Data")
+
+p
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/nyt_best_sellers.png", p, width = 8, height = 5)
+
+```
