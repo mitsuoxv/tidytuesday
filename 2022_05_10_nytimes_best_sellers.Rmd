@@ -159,3 +159,74 @@ nyt_titles %>%
 
 ```
 
+# Imitate @tanya_shapiro
+
+Not yet finished.
+
+```{r}
+
+nyt_full <- nyt_full %>% 
+  mutate(
+    author = author %>% 
+      str_remove("^! by |^\\? by "),
+    decade = year - year %% 10,
+    title = str_to_title(title)
+  ) %>% 
+  separate_rows(author, sep = " and ") # co-author
+
+top_titles <- nyt_full %>% 
+  count(author, decade, title_id, title,
+        name = "weeks") %>% 
+  group_by(author, decade) %>% 
+  slice_max(weeks, n = 1, with_ties = TRUE) %>% 
+  arrange(desc(weeks)) %>% 
+  summarize(titles = paste(title, collapse = ", "), .groups = "drop")
+
+decade <- nyt_full %>% 
+  group_by(author) %>% 
+  mutate(debut_decade = min(decade)) %>% 
+  ungroup() %>% 
+  group_by(author, decade, debut_decade) %>% 
+  summarize(
+    weeks = n(),
+    books = n_distinct(title_id),
+    .groups = "drop"
+  ) %>% 
+  group_by(decade) %>% 
+  mutate(rank = rank(-weeks, ties.method = "first")) %>% 
+  left_join(top_titles, by = c("author", "decade")) %>% 
+  arrange(decade) %>% 
+  group_by(author) %>% 
+  mutate(prev_rank = lag(rank)) %>% 
+  ungroup() %>% 
+  mutate(
+    pos = case_when(
+      is.na(prev_rank) ~ "Debut",
+      rank < prev_rank ~ "Up",
+      rank > prev_rank ~ "Down",
+      rank == prev_rank ~ "Same"
+    ),
+    pos = factor(pos, levels = c("Up", "Down", "Same", "Debut"))
+  ) %>% 
+  filter(decade >= 1970) %>% 
+  group_by(decade) %>% 
+  slice_max(weeks, n = 10, with_ties = FALSE)
+
+decade %>% 
+  ggplot() +
+  geom_segment(aes(x = x1, xend = x2, y = y1, yend = y2), color = "gray60",
+               data = tibble(x1 = 1.5, x2 = 4.5, y1 = -0.25, y2 = -0.25)) +
+  geom_text(aes(label = author, x = 2, y = rank - 0.1), hjust = 0) +
+  geom_point(aes(x = 1.8, y = rank + 0.12, shape = pos)) +
+  scale_y_reverse() +
+  scale_shape_manual(values = c(24, 25, 21, 8),
+                     guide = guide_legend(override.aes = list(size = 2))) +
+  facet_wrap(vars(paste0(decade, "s"))) +
+  labs(shape = "Decade rank shift") +
+  theme_void() +
+  theme(
+    legend.position = "top"
+  )
+
+```
+
