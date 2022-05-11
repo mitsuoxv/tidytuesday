@@ -230,3 +230,45 @@ decade %>%
 
 ```
 
+# Imitate @TannerFlorian
+
+Not complete.
+
+```{r}
+# library(ggtext)
+```
+
+```{r}
+
+nyt_titles %>% 
+  filter(year == 2020) %>% 
+  slice_max(total_weeks, n = 10, with_ties = FALSE) %>% 
+  mutate(
+    title_titlecase = str_to_title(title),
+    last_week = first_week + total_weeks * 7,
+    rank_that_year = 11 - row_number(),
+    best_label = paste0(total_weeks, " weeks: **", title_titlecase, "** by ", author)
+  ) %>% 
+  ggplot(aes(first_week, rank_that_year, color = rank_that_year)) +
+  geom_text(aes(label = best_label),
+               hjust = 0, vjust = -0.2, 
+            color = "black", size = 3) +
+  geom_segment(aes(xend = last_week, yend = rank_that_year)) +
+  geom_point() +
+  geom_point(aes(last_week)) +
+  scale_x_date(date_labels = "%B",
+               breaks = as.Date(c("2020-01-01", "2020-03-01", "2020-05-01",
+                                  "2020-07-01", "2020-09-01", "2020-11-01",
+                                  "2021-01-01"))) +
+  guides(color = "none") +
+  labs(x = NULL, y = NULL,
+       title = "NY Times best sellers in 2020",
+       caption = "Source: Post45 Data") +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank()
+  )
+```
+
