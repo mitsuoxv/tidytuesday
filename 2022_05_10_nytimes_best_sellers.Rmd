@@ -161,6 +161,7 @@ nyt_titles %>%
 
 # Imitate @tanya_shapiro
 
+https://github.com/tashapiro/TidyTuesday/blob/master/2022/W19/nyt_best_sellers.R
 Not yet finished.
 
 ```{r}
@@ -232,10 +233,11 @@ decade %>%
 
 # Imitate @TannerFlorian
 
+https://github.com/FCTanner/tidy_tuesday/blob/main/2022/2022-05-10%20NYTimes%20best%20sellers/2022-05-10-NYTimes-best-sellers.md
 Not complete.
 
 ```{r}
-# library(ggtext)
+library(ggtext)
 ```
 
 ```{r}
@@ -250,9 +252,11 @@ nyt_titles %>%
     best_label = paste0(total_weeks, " weeks: **", title_titlecase, "** by ", author)
   ) %>% 
   ggplot(aes(first_week, rank_that_year, color = rank_that_year)) +
-  geom_text(aes(label = best_label),
-               hjust = 0, vjust = -0.2, 
-            color = "black", size = 3) +
+  geom_textbox(aes(label = best_label),
+               hjust = 0, vjust = 0, width = unit(3, "inch"),
+               box.color = NA,
+               box.padding = unit(c(0, 0, 3, 0), "pt"),
+               color = "black", size = 3) +
   geom_segment(aes(xend = last_week, yend = rank_that_year)) +
   geom_point() +
   geom_point(aes(last_week)) +
