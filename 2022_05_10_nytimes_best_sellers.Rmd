@@ -276,3 +276,141 @@ nyt_titles %>%
   )
 ```
 
+# Imitate Julia Silge
+
+```{r}
+
+glimpse(nyt_titles)
+
+nyt_titles %>% 
+  ggplot(aes(total_weeks)) +
+  geom_histogram(bins = 40, color = "white")
+
+nyt_titles <- nyt_titles %>% 
+  mutate(author = author %>% 
+      str_remove("^! by |^\\? by ")) %>% 
+  separate_rows(author, sep = " and ") # co-author
+
+nyt_titles %>% 
+  group_by(author) %>% 
+  summarize(
+    n = n(),
+    total_weeks = median(total_weeks),
+    .groups = "drop_last"
+  ) %>% 
+  arrange(desc(n))
+
+```
+
+```{r}
+library(tidymodels)
+
+nyt_titles %>% 
+  select(total_weeks) %>% 
+  summary()
+
+set.seed(123)
+spl <- nyt_titles %>% 
+  transmute(
+    author,
+    total_weeks = if_else(total_weeks > 4, "long", "short")
+  ) %>% 
+  na.omit() %>% 
+  initial_split(strata = total_weeks)
+
+train <- training(spl)
+test <- testing(spl)
+
+set.seed(234)
+folds <- vfold_cv(train, strata = total_weeks)
+```
+
+```{r}
+train %>% 
+  count(total_weeks)
+```
+
+```{r}
+library(textrecipes)
+
+svm_spec <- svm_linear(mode = "classification")
+
+books_rec <- recipe(total_weeks ~ author, data = train) %>% 
+  step_tokenize_wordpiece(author, max_chars = 20) %>% 
+  step_tokenfilter(author, max_tokens = 100) %>% 
+  step_tf(author) %>% 
+  step_normalize(all_numeric_predictors())
+
+books_rec %>% 
+  prep() %>% 
+  bake(new_data = NULL) %>% 
+  glimpse()
+```
+
+```{r}
+books_wf <- workflow(books_rec, svm_spec)
+```
+
+
+```{r}
+doParallel::registerDoParallel(cores = 5)
+
+set.seed(123)
+books_metrics <- metric_set(accuracy, sens, spec)
+
+books_rs <- books_wf %>% 
+  fit_resamples(
+    resamples = folds,
+    metrics = books_metrics
+  )
+
+collect_metrics(books_rs)
+```
+
+```{r}
+final_rs <- last_fit(books_wf, spl, metrics = books_metrics)
+
+collect_metrics(final_rs)
+
+collect_predictions(final_rs) %>% 
+  conf_mat(total_weeks, .pred_class) %>% 
+  autoplot()
+```
+
+```{r}
+fitted_wf <- extract_workflow(final_rs)
+
+augment(fitted_wf, new_data = slice_sample(test, n = 1))
+```
+
+```{r}
+tidy(fitted_wf) %>% 
+  slice_max(abs(estimate), n = 20) %>% 
+  mutate(
+    term = str_remove(term, "tf_author_"),
+    term = fct_reorder(term, abs(estimate))
+  ) %>% 
+  ggplot(aes(abs(estimate), term, fill = estimate > 0)) +
+  geom_col() +
+  scale_x_continuous(expand = expansion(0)) +
+  scale_fill_discrete(labels = c("Fewer weeks", "More weeks")) +
+  labs(x = "Estimate from linear SVM (abslute value)", y = NULL,
+       fill = "How many weeks\non best seller list")
+```
+
+```{r}
+library(vetiver)
+
+v <- vetiver_model(model = fitted_wf, model_name = "nyt_authors")
+v
+
+```
+
+```{r}
+library(plumber)
+
+pr() %>% 
+  vetiver_api(v) %>% 
+  pr_run()
+```
+
