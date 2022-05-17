@@ -148,7 +148,8 @@ plot_data <- eurovision_votes %>%
 p <- plot_data %>% 
   ggplot(aes(year, share_of_12)) +
   geom_line() +
-  geom_text(aes(label = to_country), vjust = 0, hjust = 0.5, size = 3,
+  geom_point() +
+  geom_text(aes(label = to_country), vjust = -0.5, hjust = 0.5, size = 3,
             data = plot_data %>% filter(share_of_12 > 0.4)) +
   scale_y_continuous(labels = percent, limits = c(0, 0.55)) +
   labs(x = NULL, y = "Share of 12 point votes\nin the votes to the winner",
@@ -168,3 +169,49 @@ Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your p
 ggsave("image/eurovision.png", p, width = 6, height = 4)
 
 ```
+
+## Imitate Lee Olney
+
+```{r}
+
+gf <- eurovision %>% 
+  filter(section %in% c("final", "grand-final"), year != 2020) %>% 
+  group_by(artist_country) %>% 
+  mutate(n = n_distinct(year)) %>% 
+  ungroup() %>% 
+  group_by(year) %>% 
+  mutate(rank_class = case_when(
+    rank == 1 ~ "1st",
+    rank == 2 ~ "2nd",
+    rank == 3 ~ "3rd",
+    rank == max(rank) ~ "last",
+    TRUE ~ "others"
+  )) %>% 
+  ungroup()
+
+lev <- gf %>% 
+  group_by(artist_country) %>% 
+  summarize(
+    highest_rank = min(rank),
+    n = n_distinct(year)
+    ) %>% 
+  ungroup() %>% 
+  arrange(desc(n), highest_rank) %>% 
+  pull(artist_country) %>% 
+  rev()
+
+gf %>% 
+  mutate(artist_country = factor(artist_country, levels = lev)) %>% 
+  ggplot(aes(year, artist_country)) +
+  geom_line(aes(group = artist_country), size = 0.3, color = "gray60") +
+  geom_text(aes(x = 2026, label = glue::glue("n = {n}")), size = 3,
+            data = gf %>% select(artist_country, n) %>% distinct()) +
+  geom_point(aes(fill = rank_class), shape = 21) +
+  scale_fill_manual(values = c("#F50405","#F7C83A","#1CB4EB", "gray50", "white")) +
+  labs(x = NULL, y = NULL, fill = NULL,
+       title = "Eurovision final rankings",
+       caption = "Source: Eurovision") +
+  theme(legend.position = "top")
+
+```
+
