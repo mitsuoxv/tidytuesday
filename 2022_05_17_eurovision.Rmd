@@ -68,6 +68,9 @@ Explore the data and process it into a nice format for plotting! Access each dat
 eurovision <- tt$eurovision
 eurovision_votes <- tt$`eurovision-votes`
 
+skimr::skim(eurovision)
+skimr::skim(eurovision_votes)
+
 eurovision %>% 
   distinct(event)
 
@@ -82,8 +85,15 @@ I must learn how to show emoji by shortcodes in gt table.
 
 ```{r Visualize}
 
-eurovision %>% 
+winner_by_year <- eurovision %>% 
   filter(qualified == FALSE, winner == TRUE) %>% 
+  mutate(artist_country = if_else(artist_country == "Netherlands",
+                                  "The Netherlands", artist_country))
+
+winner_by_year %>% 
+  count(artist_country, sort = TRUE)
+
+winner_by_year %>% 
   select(year, artist_country, country_emoji) %>% 
   gt() %>% 
   tab_header(
@@ -92,11 +102,7 @@ eurovision %>%
 
 ```
 
-```{r}
-eurovision %>% 
-  filter(qualified == FALSE, winner == TRUE) %>% 
-  count(artist_country, sort = TRUE)
-```
+Try ggsankey.
 
 ```{r}
 eurovision_votes %>% 
@@ -125,8 +131,31 @@ eurovision_votes %>%
              value = value)) +
   geom_sankey() +
   guides(fill = "none")
+```
 
-geom_sankey()
+```{r}
+range(eurovision_votes$year)
+
+eurovision_votes %>% 
+  filter(year == 2020)
+
+plot_data <- eurovision_votes %>% 
+  filter(semi_final == "f") %>% 
+  semi_join(winner_by_year, by = c("year", "to_country" = "artist_country")) %>% 
+  group_by(year, to_country) %>% 
+  summarize(share_of_12 = mean(points == 12), .groups = "drop")
+
+p <- plot_data %>% 
+  ggplot(aes(year, share_of_12)) +
+  geom_line() +
+  geom_text(aes(label = to_country), vjust = 0, hjust = 0.5, size = 3,
+            data = plot_data %>% filter(share_of_12 > 0.4)) +
+  scale_y_continuous(labels = percent, limits = c(0, 0.55)) +
+  labs(x = NULL, y = "Share of 12 point votes\nin the votes to the winner",
+       title = "Ukraine won in 2022 by getting maximum point votes\nfrom more than 40 percent countries in the final",
+       caption = "Note: 2020 is missing\nSource: Eurovision")
+
+p
 ```
 
 # Save Image
@@ -136,8 +165,6 @@ Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your p
 ```{r}
 
 # This will save your most recent plot
-ggsave(
-  filename = "My TidyTuesday Plot.png",
-  device = "png")
+ggsave("image/eurovision.png", p, width = 6, height = 4)
 
 ```
