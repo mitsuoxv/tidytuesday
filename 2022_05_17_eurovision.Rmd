@@ -139,8 +139,30 @@ range(eurovision_votes$year)
 eurovision_votes %>% 
   filter(year == 2020)
 
-plot_data <- eurovision_votes %>% 
-  filter(semi_final == "f") %>% 
+finals <- eurovision_votes %>% 
+  filter(semi_final == "f")
+
+# Check implicitly missing zero vote
+finals %>% 
+  group_by(year) %>% 
+  summarize(
+    n = n(),
+    n_voting_countries = n_distinct(from_country),
+    check = n - n_voting_countries^2
+  ) %>% 
+  filter(check != 0)
+
+nrow(finals)
+
+# Looks like self-vote is not allowed in 2015, 2016, and since 2019
+# I decide not to make "finals" complete
+finals %>% 
+  group_by(year) %>% 
+  complete(from_country, to_country) %>% 
+  ungroup() %>% 
+  filter(is.na(points))
+
+plot_data <- finals %>% 
   semi_join(winner_by_year, by = c("year", "to_country" = "artist_country")) %>% 
   group_by(year, to_country) %>% 
   summarize(share_of_12 = mean(points == 12), .groups = "drop")
