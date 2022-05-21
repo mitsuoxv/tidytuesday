@@ -165,15 +165,19 @@ finals %>%
 plot_data <- finals %>% 
   semi_join(winner_by_year, by = c("year", "to_country" = "artist_country")) %>% 
   group_by(year, to_country) %>% 
-  summarize(share_of_12 = mean(points == 12), .groups = "drop")
+  summarize(share_of_12 = mean(points == 12), .groups = "drop") %>% 
+  left_join(winner_by_year %>% select(year, artist_country, artist),
+            by = c("year", "to_country" = "artist_country")) %>% 
+  mutate(country_artist = paste0(to_country, "\n", artist))
 
 p <- plot_data %>% 
   ggplot(aes(year, share_of_12)) +
   geom_line() +
   geom_point() +
-  geom_text(aes(label = to_country), vjust = -0.5, hjust = 0.5, size = 3,
+  geom_text(aes(label = country_artist), vjust = -0.5, hjust = 0.5, size = 3,
             data = plot_data %>% filter(share_of_12 > 0.4)) +
-  scale_y_continuous(labels = percent, limits = c(0, 0.55)) +
+  scale_x_continuous(limits = c(1975, 2025)) +
+  scale_y_continuous(labels = percent, limits = c(0, 0.6)) +
   labs(x = NULL, y = "Share of 12 point votes\nin the votes to the winner",
        title = "Ukraine won in 2022 by getting maximum point votes\nfrom more than 40 percent countries in the final",
        caption = "Note: 2020 is missing\nSource: Eurovision")
