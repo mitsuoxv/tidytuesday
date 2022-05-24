@@ -1,0 +1,190 @@
+---
+title: "Women's Rugby"
+date: 2022-05-24
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+library(lubridate)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-05-24")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+sevens <- tt$sevens
+fifteens <- tt$fifteens
+```
+
+```{r}
+range(sevens$date) # since 1997
+range(fifteens$date) # since 1982
+
+sevens %>% 
+  pivot_longer(c(team_1, team_2)) %>% 
+  distinct(value) # 152 teams
+
+fifteens %>% 
+  pivot_longer(c(team_1, team_2)) %>% 
+  distinct(value) # 73 teams
+
+sevens %>% 
+  distinct(tournament) # 127 tournaments
+
+fifteens %>% 
+  distinct(tournament) # 39 tournaments
+
+sevens %>% 
+  distinct(stage) # 126 stages
+
+sevens %>% 
+  distinct(tournament, stage) # 1045 tournament * stage
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+sevens %>% 
+  mutate(year = year(date)) %>% 
+  ggplot(aes(year, fill = tournament)) +
+  geom_histogram(binwidth = 1) +
+  guides(fill = "none")
+
+fifteens %>% 
+  mutate(year = year(date)) %>% 
+  ggplot(aes(year, fill = tournament)) +
+  geom_histogram(binwidth = 1) +
+  guides(fill = "none")
+
+sevens %>% 
+  filter(year(date) == 1997) %>% 
+  count(tournament, sort = TRUE)
+
+sevens %>% 
+  filter(tournament == "World Series") %>% 
+  count(year(date))
+
+fifteens %>% 
+  filter(year(date) == 1989) %>% 
+  count(tournament)
+
+fifteens %>% 
+  filter(tournament == "Friendly") %>% 
+  count(year(date))
+
+```
+
+```{r}
+library(patchwork)
+
+p1 <- sevens %>% 
+  count(winner, sort = TRUE, name = "win") %>% 
+  left_join(sevens %>% count(loser, sort = TRUE, name = "lose"),
+ by = c("winner" = "loser")) %>% 
+  mutate(
+    total = win + lose,
+    win_ratio = win / total
+  ) %>% 
+  filter(total > 200, winner != "Draw") %>% 
+  mutate(winner = fct_reorder(winner, win_ratio)) %>% 
+  ggplot(aes(win_ratio, winner)) +
+  geom_segment(aes(x = 0, xend = win_ratio, yend = winner)) +
+  geom_point() +
+  scale_x_continuous(labels = percent, 
+                     expand = expansion(mult = c(0, 0.1))) +
+  labs(x = "Win ratio", y = NULL,
+       title = "New Zealand is the strongest in Sevens\nof Women's Rugby",
+       subtitle = "Teams with more than 200 games",
+       caption = "Source: ScrumQueens")
+
+p2 <- fifteens %>% 
+  count(winner, sort = TRUE, name = "win") %>% 
+  left_join(fifteens %>% count(loser, sort = TRUE, name = "lose"),
+ by = c("winner" = "loser")) %>% 
+  mutate(
+    total = win + lose,
+    win_ratio = win / total
+  ) %>% 
+  filter(total > 100) %>% 
+  mutate(winner = fct_reorder(winner, win_ratio)) %>% 
+  ggplot(aes(win_ratio, winner)) +
+  geom_segment(aes(x = 0, xend = win_ratio, yend = winner)) +
+  geom_point() +
+  scale_x_continuous(labels = percent, 
+                     expand = expansion(mult = c(0, 0.1))) +
+  labs(x = "Win ratio", y = NULL,
+       title = "England edges out New Zealand in Fifteens\nof Women's Rugby",
+       subtitle = "Teams with more than 100 games",
+       caption = "Source: ScrumQueens")
+
+p <- p1 / p2
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/women-rugby.png", p, width = 6, height = 8)
+
+```
