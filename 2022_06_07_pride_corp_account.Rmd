@@ -1,0 +1,218 @@
+---
+title: "Pride Corporate Accountability Project"
+date: 2022-06-07
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+library(janitor)
+library(lubridate)
+library(ggrepel)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-06-07")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+contribution_data_all_states <- tt$contribution_data_all_states %>% 
+  clean_names()
+  
+corp_by_politician <- tt$corp_by_politician %>% 
+  clean_names()
+
+donors <- tt$donors %>% 
+  clean_names()
+
+fortune_agg <- tt$fortune_agg %>% 
+  clean_names()
+
+fortune_aggregates <- tt$fortune_aggregates %>% 
+  clean_names()
+
+pride_aggregates <- tt$pride_aggregates %>% 
+  clean_names()
+
+pride_sponsors <- tt$pride_sponsors %>% 
+  clean_names()
+
+static_list <- tt$static_list %>% 
+  clean_names()
+
+```
+
+```{r}
+rm(fortune_agg)
+
+contribution_data_all_states %>% 
+  count(state, sort = TRUE)
+
+contribution_data_all_states %>% 
+  summarize(total_amount = sum(amount, na.rm = TRUE)) # Total 27M$
+
+contribution_data_all_states %>% 
+  group_by(politician) %>% 
+  summarize(amount_by_politician = sum(amount, na.rm = TRUE)) %>% 
+  arrange(desc(amount_by_politician)) # 109 politicians
+
+range(contribution_data_all_states$date, na.rm = TRUE) # from 2013 Jan to 2022 May
+
+contribution_data_all_states %>% 
+  count(pride_and_sponsor_match, sort = TRUE)
+
+contribution_data_all_states %>% 
+  filter(!is.na(pride_and_sponsor_match)) %>% 
+  group_by(politician) %>% 
+  summarize(amount_by_politician = sum(amount, na.rm = TRUE)) %>% 
+  arrange(desc(amount_by_politician)) # 103 politicians
+
+# roughly match corp_by_politician with # total 4M$, 102 politicians
+corp_by_politician %>% 
+  count(state, sort = TRUE) 
+
+contribution_data_all_states %>% 
+  count(donor_type, wt = amount, sort = TRUE)
+
+range(pride_sponsors$year) # only 2021 and 2022
+
+fortune_aggregates %>% 
+  anti_join(pride_sponsors, by = "company") # FedEx and Fed Ex
+
+fortune_aggregates %>% 
+  anti_join(static_list, by = "company") # all 117 are included in 126 companies
+# static_list 126 companies look like all Fortune 500 companies
+
+contribution_data_all_states %>% 
+  filter(pride | hrc_business_pledge) %>% 
+  summarize(amount = sum(amount, na.rm = TRUE)) # 2.2M$
+```
+
+```{r}
+corp_by_politician %>% 
+  filter(title == "Governor")
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+Should I concentrate on years from 2019 to 2021?
+
+```{r Visualize}
+contribution_data_all_states %>% 
+  filter(pride | hrc_business_pledge) %>% 
+  group_by(year = year(date), state) %>% 
+  summarize(amount = sum(amount, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  filter(!is.na(year)) %>% 
+  ggplot(aes(factor(year), amount, fill = state)) +
+  geom_col() +
+  scale_y_continuous(labels = dollar) +
+  labs(title = "Betrayal suddently increased in 2019?",
+    subtitle = "Donation betraying either Pride or HRC Business Pledge",
+       x = NULL, y = NULL, fill = "State",
+       caption = "Source: Data for Progress")
+```
+
+```{r}
+contribution_data_all_states %>% 
+  filter(pride, !hrc_business_pledge) %>% 
+  group_by(company) %>% 
+  summarize(amount = sum(amount, na.rm = TRUE)) %>% 
+  arrange(desc(amount))
+# pride only 28, hrc_business_pledge only 8, both 7 companies
+
+```
+
+Greg Abbott, Texas Governor
+
+```{r}
+p <- contribution_data_all_states %>% 
+  mutate(
+    fortune = if_else(pride_and_sponsor_match %in% c("Both", "Fortune"),
+    "Fortune 500 companies", "Non Fortune 500"),
+    donor_name = str_to_title(donor_name)
+    ) %>% 
+  filter(politician == "Greg Abbott",
+         year(date) == 2021) %>%
+  group_by(fortune, donor_name) %>% 
+  summarize(amount = sum(amount, na.rm = TRUE), .groups = "drop") %>%
+  ggplot(aes(amount)) +
+  geom_histogram(aes(fill = fortune)) +
+  geom_text_repel(aes(x = amount, y = 30, label = donor_name), size = 3,
+                  data = . %>% filter(amount > 1e5)) +
+  geom_text_repel(aes(x = amount, y = 30, label = donor_name), size = 3,
+                  data = . %>% filter(amount >= 1e5, fortune == "Fortune 500 companies")) +
+  scale_x_log10(labels = dollar) +
+  guides(fill = "none") +
+  facet_wrap(vars(fortune), ncol = 1) +
+  labs(x = "Amount", y = "# of donors",
+       title = "Donations to Texas Governor, Greg Abbott in 2021",
+       subtitle = "Amount distribution and some largest donors",
+       caption = "Source: Data for Progress")
+
+p
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/pride_corp_account.png", p, width = 6, height = 4)
+
+```
