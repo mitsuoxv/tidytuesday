@@ -1,0 +1,148 @@
+---
+title: "US Drought"
+date: 2022-06-14
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+library(janitor)
+library(lubridate)
+library(tsibble)
+library(feasts)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-06-14")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+drought <- tt$drought %>% 
+  clean_names() %>% 
+  mutate(
+    date = date %>% 
+      str_remove("^d_") %>% 
+      ymd()
+  )
+```
+
+```{r}
+drought %>% 
+  count(state, sort = TRUE) # 48 states, all same number of observations 1528
+
+range(drought$date) # from 1895 Jan to 2022 Apr
+
+(2021 - 1894) * 12 + 4 # 1528
+(2021 - 1894) / 2
+1894 + 63.5
+1958 - 1894 # 64 years
+2021 - 1957 # 64 years
+
+drought <- drought %>% 
+  mutate(date = yearmonth(date)) %>% 
+  as_tsibble(index = date, key = state)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+drought %>% 
+  filter(state == "alabama") %>% 
+  ggplot(aes(date, d0)) +
+  geom_line()
+
+drought_by_half <- drought %>% 
+  mutate(year = year(date)) %>% 
+  filter(year < 2022) %>% 
+  mutate(before_1958 = if_else(year <= 1958, "1895-1958",
+                               "1959-2021"))
+
+drying_5_states <- drought_by_half %>% 
+  as_tibble() %>% 
+  group_by(state, before_1958) %>% 
+  summarize(n_d4_over_months = sum(d4 > 30), .groups = "drop") %>% 
+  pivot_wider(names_from = before_1958, values_from = n_d4_over_months) %>% 
+  mutate(increase = `1959-2021` - `1894-1958`) %>% 
+  slice_max(increase, n = 5) %>% 
+  pull(state)
+
+p <- drought_by_half %>% 
+  filter(state %in% drying_5_states) %>% 
+  mutate(state = state %>% 
+           str_replace_all("-", " ") %>% 
+           str_to_title()) %>% 
+  gg_season(d4) +
+  facet_grid(cols = vars(before_1958), rows = vars(state)) +
+  labs(x = "Month", y = "Exceptional drought",
+       title = "Exceptional droughts increase in some states",
+       subtitle = "Comparison of old and recent 64 years",
+       caption = "Source: Drought.gov") +
+  theme(legend.position = "none",
+        panel.grid = element_blank(),
+        axis.text = element_text(size = 6))
+
+p
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/us-drought.png", p, width = 6, height = 6)
+
+```
