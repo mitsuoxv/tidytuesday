@@ -1,0 +1,161 @@
+---
+title: "Juneteenth"
+date: 2022-06-21
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+library(ggrepel)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-06-21")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+census <- tt$census
+slave_routes <- tt$slave_routes
+firsts <- tt$firsts
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+census %>% 
+  filter(region == "USA Total") %>% 
+  pivot_longer(c(white, black_free, black_slaves)) %>% 
+  mutate(
+    name = recode(name, white = "White",
+                       black_free = "Black free", black_slaves = "Black slaves"),
+    value = value / 1e6
+    ) %>% 
+  ggplot(aes(year, value, fill = name)) +
+  geom_col() +
+  scale_x_continuous(breaks = 179:187 * 10) +
+  scale_y_continuous() +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(x = NULL, y = "Million persons", fill = NULL,
+       title = "US population by status")
+```
+
+```{r}
+slave_routes %>% 
+  count(port_origin, wt = n_slaves_arrived, sort = TRUE)
+
+slave_routes %>% 
+  count(place_of_purchase, wt = n_slaves_arrived, sort = TRUE)
+
+slave_routes %>% 
+  count(port_arrival, wt = n_slaves_arrived, sort = TRUE)
+
+slave_routes %>% 
+  count(year_arrival, wt = n_slaves_arrived, sort = TRUE) %>% 
+  mutate(n = n / 1000) %>% 
+  ggplot(aes(year_arrival, n)) +
+  geom_line() +
+  labs(x = NULL, y = "# of slaves (thousands per year)",
+       title = "Peak looks around 1800, but not sure, as there are many missing data")
+```
+
+```{r}
+firsts %>% 
+  count(category, sort = TRUE)
+
+set.seed(123)
+
+firsts %>% 
+  filter(year < 1870) %>% 
+  mutate(
+    accomplishment = accomplishment %>% 
+      str_match("African-American (.+)") %>% 
+      `[`(, 2)
+    ) %>% 
+  ggplot(aes(1, year)) +
+  geom_text(aes(label = accomplishment),
+            position = position_jitter(width = 0.2),
+            size = 3, hjust = 0) +
+  scale_x_continuous(NULL, breaks = NULL, limits = c(0, 10)) +
+  facet_wrap(vars(category))
+
+p <- firsts %>% 
+  filter(category == "Law") %>% View()
+  mutate(
+    accomplishment = accomplishment %>%
+      str_match("African-American (.+)") %>%
+      `[`(, 2)
+    ) %>%
+  ggplot(aes(1, year)) +
+  geom_text(aes(label = accomplishment), size = 3, hjust = 0) +
+  scale_x_continuous(breaks = NULL, limits = c(0, 10)) +
+  labs(x = NULL, y = NULL,
+       title = "First African-American accomplishments in laws",
+       caption = "Source: WEB DuBois style by Anthony Starks")
+
+p
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/juneteenth.png", p, width = 7, height = 8)
+
+```
