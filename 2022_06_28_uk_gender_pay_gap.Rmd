@@ -266,3 +266,42 @@ library(patchwork)
 p1 / p2 / p3
 ```
 
+## Take 4: Bayesian posterior
+
+```{r}
+library(brms)
+
+d <- paygap_by_word %>% 
+  mutate(word = factor(word))
+
+b4 <- brm(
+  formula = diff_wage ~ 0 + word,
+  data = d,
+  family = gaussian,
+  prior = c(
+    prior(normal(0, 0.1), class = b),
+    prior(exponential(1), class = sigma)
+  ),
+  chains = 4, iter = 2000, warmup = 1000, cores = 4,
+  seed = 4
+)
+
+print(b4)
+```
+
+```{r}
+library(tidybayes)
+
+as_draws_df(b4) %>% 
+  select(starts_with("b_")) %>% 
+  pivot_longer(everything(), names_to = "word") %>% 
+  mutate(
+    word = str_remove(word, "b_word"),
+    word = fct_reorder(word, value)
+    ) %>% 
+  ggplot(aes(value, word)) +
+  stat_halfeye(size = 1) +
+  scale_x_continuous(labels = percent) +
+  labs(x = "% increase of wage in men over women", y = NULL)
+```
+
