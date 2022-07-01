@@ -147,3 +147,122 @@ Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your p
 ggsave("image/uk_gender_pay_gap.png", p, width = 6, height = 6)
 
 ```
+
+# Imitate Julia Silge
+
+```{r}
+paygap %>% 
+  select(sic_codes) %>% 
+  separate_rows(sic_codes, sep = ":") %>% 
+  count(sic_codes, sort = TRUE)
+```
+
+```{r}
+paygap %>% 
+  mutate(diff_wage = diff_median_hourly_percent / 100) %>% 
+  ggplot(aes(diff_wage)) +
+  geom_histogram(bins = 25) +
+  scale_x_continuous(limits = c(-0.5, 0.5), labels = percent)
+```
+
+```{r}
+uk_sic_codes <- read_csv("https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/527619/SIC07_CH_condensed_list_en.csv") %>% 
+  janitor::clean_names()
+```
+
+```{r}
+paygap_joined <- paygap %>% 
+  select(employer_name, diff_median_hourly_percent, sic_codes) %>% 
+  separate_rows(sic_codes, sep = ":") %>% 
+  left_join(uk_sic_codes, by = c("sic_codes" = "sic_code"))
+```
+
+```{r}
+library(tidytext)
+
+paygap_tokenized <- paygap_joined %>% 
+  unnest_tokens(word, description) %>% 
+  anti_join(get_stopwords()) %>% 
+  na.omit()
+```
+
+```{r}
+top_words <- paygap_tokenized %>% 
+  count(word, sort = TRUE) %>% 
+  filter(!word %in% c("activities", "n.e.c", "general", "non")) %>% 
+  slice_max(n, n = 40) %>% 
+  pull(word)
+
+paygap_by_word <- paygap_tokenized %>% 
+  filter(word %in% top_words) %>% 
+  transmute(
+    diff_wage = diff_median_hourly_percent / 100,
+    word
+  )
+```
+
+## Take 1: summarize and visualize
+
+```{r}
+p1 <- paygap_by_word %>% 
+  group_by(word) %>% 
+  summarize(diff_wage = mean(diff_wage)) %>% 
+  mutate(word = fct_reorder(word, diff_wage)) %>% 
+
+  ggplot(aes(diff_wage, word)) +
+  geom_point() +
+  scale_x_continuous(labels = percent) +
+  labs(x = "% increase of wage in men over women", y = NULL)
+```
+
+## Take 2: fit a single linear model
+
+```{r}
+paygap_fit <- lm(diff_wage ~ 0 + word, data = paygap_by_word)
+
+summary(paygap_fit)
+```
+
+```{r}
+library(broom)
+
+p2 <- tidy(paygap_fit) %>% 
+  mutate(
+    term = str_remove(term, "word"),
+    term = fct_reorder(term, -estimate)
+  ) %>% 
+  
+  dotwhisker::dwplot(
+    vars_order = levels(.$term)
+  ) +
+  scale_x_continuous(labels = percent) +
+  labs(x = "% increase of wage in men over women", y = NULL)
+```
+
+## Take 3: fit many models
+
+```{r}
+library(rsample)
+
+paygap_intervals <- reg_intervals(diff_wage ~ 0 + word, data = paygap_by_word)
+```
+
+```{r}
+p3 <- paygap_intervals %>% 
+  mutate(
+    term = str_remove(term, "word"),
+    term = fct_reorder(term, .estimate)
+  ) %>% 
+  
+  ggplot(aes(.estimate, term)) +
+  geom_crossbar(aes(xmin = .lower, xmax = .upper)) +
+  scale_x_continuous(labels = percent) +
+  labs(x = "% increase of wage in men over women", y = NULL)
+```
+
+```{r}
+library(patchwork)
+
+p1 / p2 / p3
+```
+
