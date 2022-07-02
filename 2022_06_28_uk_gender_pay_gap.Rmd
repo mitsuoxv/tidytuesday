@@ -244,7 +244,8 @@ p2 <- tidy(paygap_fit) %>%
 ```{r}
 library(rsample)
 
-paygap_intervals <- reg_intervals(diff_wage ~ 0 + word, data = paygap_by_word)
+paygap_intervals <- reg_intervals(diff_wage ~ 0 + word, data = paygap_by_word,
+                                  type = "percentile")
 ```
 
 ```{r}
@@ -264,6 +265,27 @@ p3 <- paygap_intervals %>%
 library(patchwork)
 
 p1 / p2 / p3
+```
+
+```{r}
+services <- paygap_by_word %>% 
+  filter(word == "services")
+
+services %>% 
+  ggplot(aes(diff_wage)) +
+  geom_histogram(bins = 25)
+
+services %>% 
+  ggplot(aes(x = 1, y = diff_wage)) +
+  geom_boxplot()
+
+services %>% 
+  filter(diff_wage < -4) # strange outlier, diff_wage should be between -0.5 and 0.5
+
+# not just "services", but "specialised", "human", and
+# "management" gets wider in p3
+paygap_by_word %>% 
+  filter(diff_wage < -4) 
 ```
 
 ## Take 4: Bayesian posterior
@@ -300,7 +322,7 @@ as_draws_df(b4) %>%
     word = fct_reorder(word, value)
     ) %>% 
   ggplot(aes(value, word)) +
-  stat_halfeye(size = 1) +
+  stat_halfeye(.width = 0.95, size = 1) +
   scale_x_continuous(labels = percent) +
   labs(x = "% increase of wage in men over women", y = NULL)
 ```
