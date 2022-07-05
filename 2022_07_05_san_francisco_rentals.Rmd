@@ -1,0 +1,187 @@
+---
+title: "San Francisco Rentals"
+date: 2022-07-05
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+library(lubridate)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-07-05")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+rent <- tt$rent
+sf_permits <- tt$sf_permits
+new_construction <- tt$new_construction
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+reference <- "Source: Pennington, Kate (2018). Bay Area Craigslist Rental Housing Posts, 2000-2018.\nRetrieved from https://github.com/katepennington/historic_bay_area_craigslist_housing_posts/blob/master/clean_2000_2018.csv.zip."
+
+range(new_construction$year)
+
+new_construction %>% 
+  count(county, sort = TRUE)
+
+new_construction %>% 
+  filter(county == "Alameda County") %>% 
+  ggplot(aes(year, totalproduction)) +
+  geom_col()
+
+new_construction %>% 
+  pivot_longer(sfproduction:mhproduction) %>% 
+  mutate(name = recode(name,
+                       "sfproduction" = "Single Family",
+                       "mfproduction" = "Multi Family",
+                       "mhproduction" = "Mobile Home"
+                       )) %>% 
+  ggplot(aes(year, value, fill = name)) +
+  geom_col() +
+  scale_fill_brewer(palette = "Set2") +
+  facet_wrap(vars(county)) +
+  guides(fill = guide_legend(reverse = TRUE)) +
+  labs(x = NULL, y = "Production", fill = "Type",
+       title = "New construction in San Francisco by county, 1990-2018",
+       caption = reference) +
+  theme(legend.position = "top")
+```
+
+```{r}
+skimr::skim(sf_permits)
+
+sf_permits %>% 
+  count(year = year(filed_date), permit_type_definition) %>% 
+  ggplot(aes(year, n, fill = permit_type_definition)) +
+  geom_col() +
+  labs(x = NULL, y = "count", fill = "Type",
+       title = "Permits filed in San Francisco",
+       caption = reference)
+
+sf_permits %>% 
+  ggplot(aes(estimated_cost, fill = permit_type_definition)) +
+  geom_histogram() +
+  scale_x_log10(labels = dollar) +
+  guides(fill = "none") +
+  facet_wrap(vars(permit_type_definition), scales = "free_y") +
+  labs(title = "Estimated cost distribution",
+       caption = reference)
+
+sf_permits %>% 
+  ggplot(aes(revised_cost, fill = permit_type_definition)) +
+  geom_histogram() +
+  scale_x_log10(labels = dollar) +
+  guides(fill = "none") +
+  facet_wrap(vars(permit_type_definition), scales = "free_y") +
+  labs(title = "Revised cost distribution",
+       caption = reference)
+
+p1 <- sf_permits %>% 
+  filter(!is.na(estimated_cost), !is.na(revised_cost)) %>% 
+  mutate(
+    revised_ratio = revised_cost / estimated_cost,
+    revised_up = revised_ratio > 1
+    ) %>% 
+  count(permit_type_definition, revised_up) %>% 
+  group_by(permit_type_definition) %>% 
+  mutate(prop = n / sum(n)) %>% 
+  filter(revised_up) %>%
+  mutate(permit_type_definition = factor(permit_type_definition,
+                                         levels = c("new construction wood frame", "new construction", "demolitions", "additions alterations or repairs"))) %>% 
+  ggplot(aes(prop, permit_type_definition)) +
+  geom_col(aes(fill = permit_type_definition)) +
+  guides(fill = "none") +
+  scale_x_continuous(labels = percent) +
+  scale_fill_brewer(palette = "Set2", direction = -1) +
+  labs(x = NULL, y = NULL,
+       title = "Percent of cases: revised cost > estimated cost")
+
+p2 <- sf_permits %>% 
+  mutate(revised_ratio = revised_cost / estimated_cost) %>% 
+  filter(revised_ratio > 1) %>% 
+  ggplot(aes(revised_ratio, fill = permit_type_definition)) +
+  geom_histogram(bins = 50) +
+  scale_x_log10(breaks = 10^(0:5), limits = c(0.5, 1e+2)) +
+  scale_fill_brewer(palette = "Set2", direction = 1) +
+  guides(fill = "none") +
+  facet_wrap(vars(permit_type_definition), ncol = 1, scales = "free_y") +
+  labs(title = "Revised / estimated cost ratio, when revised up",
+       x = "revised ratio")
+
+library(patchwork)
+
+p <- p1 + p2 +
+  plot_layout(ncol = 1, heights = c(1, 4)) +
+  plot_annotation(title = "Costs often baloon from estimation",
+                  caption = reference)
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/sf_rent.png", p, width = 8, height = 8)
+
+```
