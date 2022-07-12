@@ -111,7 +111,7 @@ p <- flights_month %>%
   labs(x = NULL, y = "Average flights per day",
        color = "Airports",
        title = "Still struggling to come back to normalcy",
-       subtitle = "# of departure flights at 20 large airports in Europe",
+       subtitle = "# of departure flights at 10 large airports in Europe",
        caption = "Source: Eurocontrol")
 
 flights_month %>% 
