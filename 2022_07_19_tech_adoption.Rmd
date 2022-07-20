@@ -1,0 +1,182 @@
+---
+title: "Technology Adoption"
+date: 2022-07-20
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+library(countrycode)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-07-19")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+technology <- tt$technology
+
+skimr::skim(technology)
+
+technology %>% 
+  count(group, sort = TRUE)
+
+technology %>% 
+  count(category, sort = TRUE)
+
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+technology %>% 
+  filter(iso3c == "USA", category == "Communications") %>% 
+  ggplot(aes(year, value, color = variable)) +
+  geom_line()
+
+technology %>% 
+  filter(variable == "cell_subsc") %>% 
+  ggplot(aes(year, value, color = iso3c)) +
+  geom_line(show.legend = FALSE)
+  
+```
+
+Get population, area_km2 and gdp_usd
+
+```{r}
+
+library(rvest)
+
+cc_html <- read_html("https://countrycode.org/")
+
+cc_df <- cc_html %>% 
+  html_nodes("table") %>% 
+  .[[1]] %>% 
+  html_table() %>% 
+  janitor::clean_names() %>% 
+  separate(iso_codes, c("iso2", "iso3"), sep = " / ") %>% 
+  separate(gdp_usd, c("gdp_usd", "gdp_unit"), sep = " ") %>% 
+  mutate(
+    population = parse_number(population),
+    area_km2 = parse_number(area_km2),
+    gdp_usd = parse_number(gdp_usd),
+    gdp_bil_usd = if_else(gdp_unit == "Million", gdp_usd / 1e3,
+                      if_else(gdp_unit == "Trillion", gdp_usd * 1e3, gdp_usd)), # Bilion USD
+    percap_gdp = gdp_bil_usd / (population / 1e9) # USD per person
+    )
+```
+
+NAs in gdp_usd are mainly small islands.
+
+```{r}
+cc_df %>% 
+  slice(c(8, 30, 45, 46, 134, 141, 146, 149, 168, 174, 178, 179, 206, 216, 222, 224, 233, 236, 237))
+```
+
+Merge
+
+```{r}
+technology2 <- technology %>% 
+  left_join(cc_df %>% select(country, iso3:area_km2, gdp_bil_usd:percap_gdp),
+            by = c("iso3c" = "iso3"))
+```
+
+
+```{r}
+technology2 %>% 
+  filter(category == "Transport") %>% 
+  count(variable, label, sort = TRUE)
+
+technology2 %>% 
+  filter(variable == "railline") %>% 
+  ggplot(aes(year, value, color = iso3c)) +
+  geom_line(show.legend = FALSE)
+
+p <- technology2 %>% 
+  filter(variable == "railline", population > 1e7) %>% # more than 10M population
+  mutate(rail_per_km2 = value / area_km2) %>% 
+  group_by(iso3c) %>% 
+  mutate(rail_per_km2_max = max(rail_per_km2)) %>% 
+  ungroup() %>% 
+  filter(rail_per_km2_max > 0.05) %>% 
+  mutate(country = country %>% 
+           fct_reorder(rail_per_km2_max) %>% 
+           fct_rev()) %>% 
+  
+  ggplot(aes(year, rail_per_km2, color = country)) +
+  geom_line() +
+  geom_point(data = . %>% filter(near(rail_per_km2, rail_per_km2_max))) +
+  scale_color_brewer(palette = "Paired") +
+  labs(x = NULL, y = "Rail length (km) / Area (km2)",
+       color = "Country",
+       title = "Rail density peaked around 1950",
+       subtitle = "Top 9 countries with highest rail density (point),\namong > 10M population countries.\nArea is constant without considering border changes.",
+       caption = "Source: The CHAT dataset (https://www.nber.org/papers/w15319)\nand https://countrycode.org/")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/technology_rail.png", p, width = 6, height = 4)
+
+```
