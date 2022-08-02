@@ -1,0 +1,184 @@
+---
+title: "Oregon Spotted Frog"
+date: 2022-08-02
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+library(lubridate)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+frog <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-08-02/frog.csv')
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+glimpse(frog)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+frog <- janitor::clean_names(frog) %>% 
+  mutate(survey_date = mdy(survey_date))
+
+skimr::skim(frog)
+```
+
+```{r}
+range(frog$survey_date) # from 9/12 to 11/29 in 2018
+```
+
+```{r}
+unique_frogs <- frog %>% 
+  distinct(site, frequency, female) %>%
+  arrange(frequency) # 32 unique frogs
+
+unique_frogs %>% 
+  count(female) # 10 male, 22 female
+```
+
+```{r}
+frog %>% 
+  filter(frequency == 164.169) %>% View()
+
+frog %>% 
+  count(site)
+
+frog %>% 
+  count(subsite, sort = TRUE)
+
+frog %>% 
+  count(hab_type, sort = TRUE)
+
+frog %>% 
+  count(water, sort = TRUE)
+
+frog %>% 
+  count(type, sort = TRUE)
+
+frog %>% 
+  count(structure, sort = TRUE)
+
+frog %>% 
+  count(substrate, sort = TRUE)
+
+frog %>% 
+  count(beaver, sort = TRUE)
+
+frog %>% 
+  count(detection, sort = TRUE)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+frog %>% 
+  ggplot(aes(utme_83)) +
+  geom_histogram()
+
+frog %>% 
+  ggplot(aes(utmn_83)) +
+  geom_histogram()
+
+frog %>% 
+  ggplot(aes(utme_83, utmn_83, group = frequency,
+             color = factor(frequency), shape = factor(female)),) +
+  geom_line() +
+  geom_point(size = 2) +
+  guides(color = "none")
+
+frog %>% 
+  filter(between(utme_83, 597330, 597430), between(utmn_83, 4846400, 4846500)) %>% 
+  ggplot(aes(utme_83, utmn_83, group = frequency,
+             color = factor(frequency), shape = factor(female))) +
+  geom_line() +
+  geom_point(size = 2) +
+  guides(color = "none") +
+  scale_x_continuous(breaks = 597330 + 0:5 * 20) +
+  scale_y_continuous(breaks = 4846400 + 0:5 * 20) +
+  scale_color_brewer(palette = "Accent")
+```
+
+
+```{r}
+frog %>% 
+  count(survey_date, sort = TRUE)
+
+frog %>% 
+  filter(survey_date == "2018-10-10") %>% 
+  distinct(frequency) %>% 
+  count() # 12 frogs observed on 2018-10-10
+
+frog %>% 
+  filter(survey_date == "2018-10-10") %>% 
+  ggplot(aes(utme_83, utmn_83, color = factor(female))) +
+  geom_point(size = 2)
+
+library(gganimate)
+
+p <- frog %>% 
+  mutate(sex = if_else(female == 1, "female", "male")) %>% 
+  ggplot(aes(utme_83, utmn_83, color = sex)) +
+  geom_point(size = 2) +
+  labs(title = "Frogs move together",
+       subtitle = "Survey date: {frame_time}",
+       x = "UTME_83", y = "UTMN_83",
+       color = "Sex", shape = "Water",
+       caption = "Source: USGS") +
+  transition_time(survey_date) +
+  ease_aes("linear")
+
+animate(p, fps = 2)
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+anim_save("oregon-frog.gif", path = "image")
+
+```
