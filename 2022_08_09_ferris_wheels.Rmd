@@ -1,0 +1,132 @@
+---
+title: "Ferris Wheels"
+date: 2022-08-09
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+library(ggrepel)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-08-09")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+wheels <- tt$wheels
+
+skimr::skim(wheels)
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+wheels %>% 
+  ggplot(aes(opened, height, color = ride_duration_minutes)) +
+  geom_point() +
+  scale_color_viridis_c()
+
+wheels %>% 
+  ggplot(aes(height, ride_duration_minutes)) +
+  geom_point() +
+  geom_smooth()
+
+wheels %>% 
+  ggplot(aes(passengers_per_cabin)) +
+  geom_histogram(binwidth = 1)
+
+wheels %>% 
+  count(passengers_per_cabin)
+
+p <- wheels %>% 
+  ggplot(aes(diameter, number_of_cabins, color = passengers_per_cabin)) +
+  geom_point() +
+  geom_smooth(data = . %>% filter(between(passengers_per_cabin, 6, 8)),
+              formula = y ~ x,
+              method = "lm", se = FALSE, fullrange = TRUE) +
+  annotate("text", x = 30, y = 60, label = "Fitted line only for\n6-8 passengers per cabin",
+           vjust = 0, hjust = 0) +
+  annotate("curve", x = 10, y = 10, xend = 0, yend = 23, 
+    curvature = .3, arrow = arrow(length = unit(2, "mm"))
+  ) +
+  annotate("text", x = 10, y = 10, label = "y-intercept is not zero",
+           vjust = 1, hjust = 0) +
+  geom_text_repel(aes(label = paste0(name, ", ", country)),
+            data = . %>% filter(passengers_per_cabin > 10),
+            size = 3) +
+  scale_y_continuous(limits = c(0, 75)) +
+  scale_x_continuous(limits = c(0, 700)) +
+  scale_color_gradient2(low = "black", mid = "white", high = "brown",
+                        midpoint = 10, guide = guide_colorsteps()) +
+  labs(x = "Diameter (feet)", y = "# of cabins",
+       color = "Passengers\nper cabin",
+       title = "# of cabins is not proportional to diameter,\neven when passengers per cabin are fixed at 6-8",
+       caption = "Source: {ferriswheels}")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/ferris_wheels.png", p, width = 6, height = 4)
+
+```
