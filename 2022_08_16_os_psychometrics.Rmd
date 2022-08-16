@@ -1,0 +1,164 @@
+---
+title: "Open Source Psychometrics"
+date: 2022-08-16
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-08-16")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+characters <- tt$characters
+psych_stats <- tt$psych_stats
+myers_briggs <- tt$myers_briggs
+```
+
+```{r}
+dim(characters) # 889 characters
+
+characters %>% 
+  distinct(uni_id, uni_name) %>%  # from 100 universes
+  View()
+
+characters %>% 
+  filter(uni_id == "SW") # 6 characters from Star Wars
+```
+
+```{r}
+nrow(psych_stats) # 889 characters * 401 questions (only Q.hard/soft doubles)
+
+head(psych_stats)
+
+psych_stats %>% 
+  count(question, sort = TRUE)
+
+psych_stats %>% 
+  filter(char_id == "ALA8") %>%
+  View()
+
+psych_stats %>% 
+  filter(question == "Coke/Pepsi") %>% 
+  count(personality)
+
+psych_stats %>% 
+  group_by(char_id) %>% 
+  filter(question == "hard/soft") %>% 
+  count(rank, sort = TRUE)
+```
+
+```{r}
+myers_briggs %>% 
+  count(char_id, sort = TRUE)
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+top5_uni <- psych_stats %>% 
+  group_by(uni_id, uni_name, char_id, char_name) %>% 
+  summarize(responses = sum(number_ratings) / 401, .groups = "drop") %>% 
+  group_by(uni_id, uni_name) %>% 
+  summarize(
+    n_characters = n(),
+    avg_responses = mean(responses), .groups = "drop"
+    ) %>% 
+  slice_max(avg_responses, n = 5) %>% 
+  pull(uni_id)
+
+top5_uni_stats <- psych_stats %>% 
+  filter(uni_id %in% top5_uni)  # 5 Universes * 6 characters * 401 questions
+
+certain5 <- top5_uni_stats %>% 
+  group_by(char_id, char_name) %>% 
+  slice_min(rating_sd, n = 1) %>% 
+  ungroup() %>% 
+  slice_min(rating_sd, n = 5)
+
+uncertain5 <- top5_uni_stats %>% 
+  group_by(char_id, char_name) %>% 
+  slice_max(rating_sd, n = 1) %>% 
+  ungroup() %>% 
+  slice_max(rating_sd, n = 5)
+  
+p <- bind_rows(certain5, uncertain5) %>% 
+  mutate(
+    name_personality = paste0(char_name, " / ", personality),
+    name_personality = fct_reorder(name_personality, rating_sd)
+    ) %>% 
+  ggplot(aes(y = name_personality)) +
+  geom_point(aes(x = rating_sd)) +
+  geom_segment(aes(x = 0, xend = rating_sd, yend = name_personality)) +
+  scale_x_continuous(limits = c(0, 45), expand = c(0, 0)) +
+  labs(x = "Rating standard deviation (rating score out of 100)", y = NULL,
+       title = "Respondents are confident Scar is vengeful,\nbut not sure Princess Leia is really a princess",
+       subtitle = "Characters are from top 5 universes in terms of # of responses",
+       caption = "Source: Open-Source Psychometrics Project")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/os_psychometrics.png", p, width = 7, height = 4)
+
+```
