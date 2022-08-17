@@ -162,3 +162,45 @@ Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your p
 ggsave("image/os_psychometrics.png", p, width = 7, height = 4)
 
 ```
+
+# Error bar chart
+
+```{r}
+top5_uni_stats2 <- top5_uni_stats %>% 
+  mutate(
+    se = rating_sd / sqrt(number_ratings),
+    ul = avg_rating + se,
+    ll = avg_rating - se
+    )
+
+certain6 <- top5_uni_stats2 %>% 
+  group_by(char_id, char_name) %>% 
+  slice_max(ul, n = 1) %>% 
+  ungroup() %>% 
+  slice_max(ul, n = 6)
+
+uncertain6 <- top5_uni_stats2 %>% 
+  group_by(char_id, char_name) %>% 
+  slice_min(ll, n = 1) %>% 
+  ungroup() %>% 
+  slice_min(ll, n = 6)
+  
+p2 <- bind_rows(certain6, uncertain6) %>% 
+  mutate(
+    name_personality = paste0(char_name, " / ", personality),
+    name_personality = fct_reorder(name_personality, avg_rating)
+    ) %>% 
+  ggplot(aes(avg_rating, name_personality)) +
+  geom_point() +
+  geom_errorbar(aes(xmin = ll, xmax = ul), width = 0.3) +
+  geom_vline(xintercept = 50, lty = 2) +
+  scale_x_continuous(limits = c(40, 100), expand = c(0, 0)) +
+  labs(x = "Average rating (score out of 100)", y = NULL,
+       title = "Respondents are confident Scar is vengeful,\nbut not sure Princess Leia is Swedish or Italian",
+       subtitle = "Characters are from top 5 universes in terms of # of responses\nError bar denotes plus minus one standard error",
+       caption = "Source: Open-Source Psychometrics Project")
+```
+
+```{r}
+ggsave("image/os_psychometrics2.png", p2, width = 8, height = 4)
+```
