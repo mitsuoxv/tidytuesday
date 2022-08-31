@@ -1,0 +1,192 @@
+---
+title: "Pell Grants"
+date: 2022-08-31
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-08-30")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+pell <- tt$pell %>% 
+  janitor::clean_names()
+
+skimr::skim(pell)
+```
+
+```{r}
+# 50 states plus 9
+# "AS" "DC" "FM" "GU" "MH" "MP" "PR" "PW" "VI"
+pell %>% 
+  distinct(state) %>%
+  pull(state) %>% 
+  setdiff(state.abb)
+
+# session column is redundant
+pell %>% 
+  separate(session, c("ses_year", "ses_id")) %>% 
+  filter(as.numeric(ses_year) != year)
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+pell <- pell %>% 
+  select(-session) %>% 
+  mutate(per_capita_award = award / recipient)
+
+pell %>% 
+  ggplot(aes(award)) +
+  geom_histogram() +
+  scale_x_log10()
+
+pell %>% 
+  ggplot(aes(per_capita_award)) +
+  geom_histogram() +
+  scale_x_log10()
+
+pell %>% 
+  ggplot(aes(recipient)) +
+  geom_histogram() +
+  scale_x_log10()
+```
+
+```{r}
+pell %>% 
+  filter(is.na(per_capita_award))
+
+summarize_per_capita <- function(tbl) {
+  tbl %>% 
+    summarize(
+    award = sum(award),
+    recipient = sum(recipient),
+    per_capita_award = award / recipient
+  )
+}
+
+pell_by_year <- pell %>% 
+  filter(!is.na(per_capita_award)) %>% 
+  group_by(year) %>% 
+  summarize_per_capita()
+
+pell_by_year %>% 
+  ggplot(aes(year, award)) +
+  geom_line()
+
+pell_by_year %>% 
+  ggplot(aes(year, per_capita_award)) +
+  geom_line()
+
+pell_by_year %>% 
+  ggplot(aes(year, recipient / 1e6)) +
+  geom_line() +
+  scale_y_continuous("# of recipients (millions)",
+                     limits = c(0, 10), breaks = seq(0, 10, 2)) +
+  labs(x = NULL,
+       title = "Pell grant recipients peaked in 2011",
+       caption = "Source: Department of Education")
+```
+
+```{r}
+pell %>% 
+  count(year, sort = TRUE)
+
+pell_by_state_2011 <- pell %>% 
+  filter(year == 2011) %>% 
+  group_by(state) %>% 
+  summarize_per_capita()
+
+pell_by_state_2011 %>% 
+  ggplot(aes(per_capita_award)) +
+  geom_histogram()
+
+pell_by_state_2011 %>% 
+  arrange(desc(award))
+```
+
+```{r}
+p <- pell %>% 
+  ggplot(aes(per_capita_award)) +
+  geom_histogram(aes(weight = recipient / 1e3), binwidth = 200) +
+  geom_vline(aes(xintercept = per_capita_award), data = pell_by_year,
+             lty = 2) +
+  scale_x_continuous(breaks = c(3000, 6000), labels = dollar) +
+  facet_wrap(vars(year), ncol = 5) +
+  coord_cartesian(xlim = c(0, 6000)) +
+  labs(x = "Award per recipient", y = "# of recipients (thousands) in $200 binwidth",
+       title = "Award per recipient looks more dispersed in recent years",
+       subtitle = "Dashed line is mean. Assuming zero variance in the same university.",
+       caption = "Source: Department of Education") +
+  theme(panel.grid.minor = element_blank())
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/pell-grants.png", p, width = 6, height = 5)
+
+```
