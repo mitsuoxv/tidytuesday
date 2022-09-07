@@ -1,0 +1,118 @@
+---
+title: "LEGO database"
+date: 2022-09-07
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+inventories <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-09-06/inventories.csv.gz')
+inventory_sets <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-09-06/inventory_sets.csv.gz')
+sets <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-09-06/sets.csv.gz')
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+glimpse(inventories)
+glimpse(inventory_sets)
+glimpse(sets)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+inventories %>% 
+  count(set_num, version, sort = TRUE)
+
+inventory_merged <- inventory_sets %>% 
+  left_join(sets, by = "set_num")
+
+inventory_merged %>% 
+  count(year, theme_id, wt = quantity, name = "quantity", sort = TRUE)
+
+sets %>% 
+  count(year, theme_id, sort = TRUE)
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+range(inventory_merged$year)
+
+inventory_merged %>% 
+  count(set_num, name, year, wt = quantity, name = "quantity", sort = TRUE) %>% 
+  count(year, wt = quantity, name = "quantity") %>% 
+  ggplot(aes(year, quantity)) +
+  geom_col() +
+  labs(x = "Set sales year", y = "Inventory quantity",
+       title = "LEGO of 1964 sales is still in inventory",
+       caption = "Source: rebrickable")
+  
+```
+
+```{r}
+p <- sets %>% 
+  filter(year >= 1970) %>% 
+  mutate(
+    decade = (year %/% 10) * 10,
+    decade = paste0(decade, "s")
+    ) %>% 
+  ggplot(aes(num_parts)) +
+  geom_density(adjust = 1/2, fill = "gray80") +
+  geom_vline(xintercept = 1000, lty = 2) +
+  scale_x_log10() +
+  scale_y_continuous(expand = expansion(add = c(0, 0.1))) +
+  facet_wrap(vars(decade), nrow = 2) +
+  labs(x = "# of parts (log scale)", y = "Density",
+       title = "Sets with more than 1000 parts are getting popular",
+       subtitle = "Decades by set sales year",
+       caption = "Source: rebrickable")
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/lego-db.png", p, width = 6, height = 4)
+
+```
