@@ -1,0 +1,209 @@
+---
+title: "Bigfoot"
+date: 2022-09-13
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+library(lubridate)
+
+library(scales)
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+bigfoot <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-09-13/bfro_reports_geocoded.csv')
+
+```
+
+
+# Readme
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+glimpse(bigfoot)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+skimr::skim(bigfoot)
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+range(bigfoot$date, na.rm = TRUE)
+
+bigfoot %>% 
+  ggplot(aes(date)) +
+  geom_histogram(binwidth = 365)
+```
+
+```{r}
+bigfoot %>%
+  filter(longitude > -130) %>% 
+  mutate(
+    years = if_else(year(date) < 1960, "1869-1959",
+                         if_else(year(date) < 1990, "1960-1989", "1990-2021")),
+    season = factor(season, levels = c("Spring", "Summer", "Fall", "Winter", "Unknown"))
+    ) %>% 
+  ggplot(aes(longitude, latitude)) +
+  geom_polygon(aes(long, lat, group = group), color = "white", fill = "gray80",
+               data = map_data("state") %>% as_tibble()) +
+  geom_point(aes(color = classification), size = 0.5) +
+  coord_map("polyconic") +
+  facet_grid(rows = vars(season), cols = vars(years)) +
+  theme_void()
+```
+
+```{r}
+bigfoot %>% 
+  ggplot(aes(visibility)) +
+  geom_histogram() +
+  facet_wrap(vars(classification))
+```
+
+```{r}
+bigfoot %>% 
+  ggplot(aes(pressure)) +
+  geom_histogram() +
+  facet_wrap(vars(classification))
+```
+
+```{r}
+bigfoot %>% 
+  ggplot(aes(temperature_mid)) +
+  geom_histogram() +
+  facet_wrap(vars(classification))
+```
+
+```{r}
+bigfoot %>% 
+  ggplot(aes(cloud_cover)) +
+  geom_histogram() +
+  facet_wrap(vars(classification))
+```
+
+```{r}
+bigfoot %>% 
+  ggplot(aes(moon_phase)) +
+  geom_histogram() +
+  facet_wrap(vars(classification))
+```
+
+```{r}
+bigfoot %>% 
+  ggplot(aes(precip_probability)) +
+  geom_histogram() +
+  facet_wrap(vars(classification))
+```
+
+```{r}
+bigfoot %>% 
+  count(precip_type, sort = TRUE)
+```
+
+```{r}
+bigfoot %>% 
+  filter(precip_type == "rain") %>% 
+  ggplot(aes(precip_probability)) +
+  geom_histogram() +
+  facet_wrap(vars(classification))
+```
+
+```{r}
+bigfoot %>% 
+  ggplot(aes(uv_index)) +
+  geom_histogram() +
+  facet_wrap(vars(classification))
+```
+
+```{r}
+bigfoot %>% 
+  ggplot(aes(wind_bearing)) +
+  geom_histogram() +
+  facet_wrap(vars(classification))
+```
+
+```{r}
+bigfoot %>% 
+  ggplot(aes(wind_speed)) +
+  geom_histogram() +
+  facet_wrap(vars(classification))
+```
+
+```{r}
+bigfoot2 <- bigfoot %>%
+  mutate(
+    years = if_else(year(date) < 1960, "1869-1959",
+                         if_else(year(date) < 1990, "1960-1989", "1990-2021")),
+    season = factor(season, levels = c("Spring", "Summer", "Fall", "Winter", "Unknown"))
+    )
+
+bigfoot_by_state <- bigfoot2 %>% 
+  count(state, season, sort = TRUE) %>% 
+  filter(season != "Unknown") %>% 
+  mutate(state = str_to_lower(state))
+
+p <- map_data("state") %>%
+  as_tibble() %>% 
+  inner_join(bigfoot_by_state, by = c(region = "state")) %>% 
+  ggplot(aes(long, lat, group = group, fill = n)) +
+  geom_polygon(color = "white") +
+  scale_fill_gradient2(low = "#559999", mid = "grey90", high = "#BB650B",
+                         midpoint = median(bigfoot_by_state$n)) +
+  facet_wrap(vars(season)) +
+  coord_map("polyconic") +
+  labs(fill = "# of observations\nby state",
+       title = "People see bigfoot mostly as they go into the woods\nin summer, especially in the West Coast",
+       caption = "Source: Bigfoot Field Researchers Organization (BFRO) by way of Data.World") +
+  theme_void() +
+  theme(
+    legend.position = "right",
+    plot.background = element_rect(fill = "white", color = "white")
+    )
+
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/bigfoot.png", p, width = 7, height = 4)
+
+```
