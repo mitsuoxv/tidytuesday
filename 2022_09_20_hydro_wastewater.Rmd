@@ -1,0 +1,129 @@
+---
+title: "Hydro Wastewater plants"
+date: 2022-09-20
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(lubridate)
+library(scales)
+theme_set(theme_light())
+
+library(ggthemes)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-09-20")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+hydro_waste <- tt$HydroWASTE_v10 %>% 
+  janitor::clean_names()
+
+View(hydro_waste)
+
+skimr::skim(hydro_waste)
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+p <- map_data("world") %>% 
+  as_tibble() %>% 
+  filter(region != "Antarctica") %>% 
+  mutate(region = case_when(
+    region == "USA" ~ "United States",
+    region == "UK" ~ "United Kingdom",
+    TRUE ~ region
+  )) %>% 
+  ggplot() +
+  geom_polygon(aes(long, lat, group = group), 
+               color = "black", size = 0.1, fill = "white") +
+  geom_point(aes(lon_wwtp, lat_wwtp, color = env_concern),
+             data = hydro_waste %>%
+               mutate(env_concern = if_else(df < 10, "Yes", "No")),
+             size = 0.1) +
+  scale_color_manual(values = c("gray80", "red"),
+                     guide = guide_legend(override.aes = list(size = 1))) +
+  labs(subtitle = "Environmental concerns exist even in the advanced countries",
+       title = "Waste Water Treatment Plant Locations",
+       color = "Dilution factor less than 10?",
+       caption = "Source: Ehalt Macedo, H., Lehner, B., Nicell, J., Grill, G., Li, J., Limtong, A., and Shakya, R.:\nDistribution and characteristics of wastewater treatment plants within the global river network,\nEarth Syst. Sci. Data, 14, 559–577,\nhttps://doi.org/10.5194/essd-14-559-2022, 2022.") +
+  theme_map() +
+  theme(plot.background = element_rect(fill = "white", color = "white"))
+```
+
+```{r}
+hydro_waste %>% 
+  ggplot(aes(pop_served)) +
+  geom_histogram() +
+  scale_x_log10(labels = comma) +
+  labs(title = "Population served is log normal distribution",
+       x = "population served",
+       caption = "Source: Ehalt Macedo, H., Lehner, B., Nicell, J., Grill, G., Li, J., Limtong, A., and Shakya, R.:\nDistribution and characteristics of wastewater treatment plants within the global river network,\nEarth Syst. Sci. Data, 14, 559–577,\nhttps://doi.org/10.5194/essd-14-559-2022, 2022.")
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/waste_water_plant.png", p, width = 8, height = 5)
+
+```
