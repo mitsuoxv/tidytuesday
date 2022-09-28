@@ -1,0 +1,144 @@
+---
+title: "Artists in the USA"
+date: 2022-09-28
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+
+library(lubridate)
+library(scales)
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-09-27")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+artists <- tt$artists
+
+```
+
+3380 rows = 52 states * 5 races * 13 types
+
+```{r}
+artists %>% # 3380 rows
+  count(state) # 52 states
+
+artists %>% 
+  filter(state == "Alabama") %>% 
+  count(race) # 5 races
+
+artists %>% 
+  filter(state == "Alabama") %>% 
+  filter(race == "White") %>% 
+  count(type) # 13 types
+
+```
+
+```{r}
+skimr::skim(artists)
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+artists %>% 
+  group_by(type, state) %>% 
+  summarize(artists_n = sum(artists_n, na.rm = TRUE), .groups = "drop_last") %>% 
+  mutate(state_share = artists_n / sum(artists_n)) %>% 
+  slice_max(state_share, n = 3) %>% 
+  ungroup() %>% 
+  ggplot(aes(state_share, state)) +
+  geom_col() +
+  scale_x_continuous(labels = percent, breaks = c(0, 0.2, 0.4)) +
+  facet_wrap(vars(type), scales = "free_y")
+  
+```
+
+```{r}
+p <- artists %>% 
+  group_by(type, state) %>% 
+  summarize(artists_n = sum(artists_n, na.rm = TRUE), .groups = "drop_last") %>% 
+  mutate(state_share = artists_n / sum(artists_n)) %>% 
+  ungroup() %>% 
+  filter(state %in% c("California", "New York")) %>% 
+  mutate(
+    type = fct_reorder(type, state_share),
+    state = factor(state, levels = c("New York", "California"))
+  ) %>% 
+  ggplot(aes(state_share, type, fill = state)) +
+  geom_col() +
+  scale_x_continuous(labels = percent, breaks = c(0, 0.25, 0.5),
+                     expand = expansion(mult = c(0, 0.05), add = c(0, 0))) +
+  guides(fill = guide_legend(reverse = TRUE)) +
+  labs(x = "State share in # of artists", y = NULL, fill = NULL,
+       title = "More than half actors live in\nCalifornia and New York",
+       caption = "Source: arts.gov by way of Data is Plural") +
+  theme(legend.position = "top")
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/artists_usa.png", p, width = 6, height = 4)
+
+```
