@@ -152,6 +152,6 @@ Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your p
 ```{r}
 
 # This will save your most recent plot
-ggsave("image/rivalry_data.png", width = 6, height = 4)
+ggsave("image/ravelry_data.png", p, width = 6, height = 4)
 
 ```
