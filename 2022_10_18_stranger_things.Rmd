@@ -1,0 +1,162 @@
+---
+title: "Stranger things dialogue"
+date: 2022-10-18
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event! Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data. While the dataset will be "tamed", it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format. The goal of TidyTuesday is to apply your R skills, get feedback, explore other's work, and connect with the greater #RStats community! As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(lubridate)
+library(tidytuesdayR)
+
+library(tidytext)
+
+library(scales)
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-10-18")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset. This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+episodes <- tt$episodes
+dialogues <- tt$stranger_things_all_dialogue
+
+```
+
+```{r}
+episodes %>% 
+  count(directed_by, sort = TRUE)
+
+episodes %>% 
+  count(written_by, sort = TRUE)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+dialogues <- dialogues %>% 
+  mutate(duration = end_time - start_time)
+
+duration_prop <- dialogues %>% 
+  filter(!is.na(dialogue)) %>% 
+  count(season, duration, sort = TRUE) %>% 
+  group_by(season) %>% 
+  mutate(prop = n / sum(n)) %>% 
+  ungroup()
+
+duration_prop %>% 
+  ggplot(aes(duration, prop)) +
+  geom_col() +
+  scale_y_continuous(labels = percent) +
+  facet_wrap(vars(season), nrow = 1) +
+  labs(x = "Dialogue length (seconds)", y = "Proportions")
+
+duration_prop %>% 
+  mutate(long_duration = duration >= dseconds(3)) %>% # >= 3 secs
+  group_by(season, long_duration) %>% 
+  summarize(prop = sum(prop), .groups = "drop") %>% 
+  filter(long_duration) %>% 
+  ggplot(aes(season, prop)) +
+  geom_line() +
+  scale_y_continuous(labels = percent, limits = c(0, 0.4)) +
+  labs(x = "Season", y = "Proportions of dialogue length >= 3 secs")
+```
+
+```{r}
+
+dialogue_words <- dialogues %>% 
+  unnest_tokens(word, dialogue) %>% 
+  filter(!is.na(word))
+
+dialogue_words %>% 
+  anti_join(get_stopwords(), by = "word") %>% 
+  count(word, sort = TRUE)
+
+word_prop <- dialogue_words %>% 
+  count(season, episode, line, duration, sort = TRUE) %>% 
+  count(season, n, name = "n_count") %>% 
+  group_by(season) %>% 
+  mutate(
+    prop = n_count / sum(n_count),
+    mean = sum(n * prop)
+    ) %>% 
+  ungroup()
+
+p <- word_prop %>% 
+  ggplot(aes(n, prop)) +
+  geom_col(aes(fill = n <= 4)) +
+  geom_vline(aes(xintercept = mean)) +
+  scale_y_continuous(labels = percent) +
+  facet_wrap(vars(season), ncol = 1) +
+  guides(fill = "none") +
+  labs(x = "# of words per dialogue", y = "Proportions",
+       title = "Dialogue tends to be short in Season 3 in Stranger Things",
+       subtitle = "vertical line is mean # of words per dialogue by season",
+       caption = "Source: 8flix.com via Dan Fellowes & Jonathan Kitt")
+
+dialogue_words %>% 
+  count(season, episode, line, duration, sort = TRUE) %>% 
+  left_join(duration_prop, by = c("season", "duration"),
+            suffix = c("_words", "_duration")) %>% 
+  ggplot(aes(duration, n_words)) +
+  geom_boxplot(aes(group = duration, fill = prop)) +
+  scale_fill_viridis_c(labels = percent) +
+  facet_wrap(vars(season), nrow = 1) +
+  labs(x = "Dialogue length (seconds)", y = "# of words",
+       fill = "dialogue\nlength\nproportions\nby season")
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter!
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/stranger-things.png", p, width = 6, height = 4)
+
+```
