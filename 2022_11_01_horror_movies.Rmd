@@ -1,0 +1,180 @@
+---
+title: "Horro Movies"
+date: 2022-11-01
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(lubridate)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-11-01")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+horror_movies <- tt$horror_movies %>% 
+  mutate(
+    budget = budget / 1e6,
+    revenue = revenue / 1e6
+  )
+
+skimr::skim(horror_movies)
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+annual_data <- horror_movies %>% 
+  filter(runtime >= 60) %>% 
+  mutate(release_year = year(release_date)) %>% 
+  group_by(release_year) %>% 
+  summarize(
+    n = n(),
+    weighted_vote_average = weighted.mean(vote_average, vote_count),
+    across(c(popularity, vote_count, vote_average, budget, revenue, runtime), ~ mean(.x))
+
+  )
+
+annual_data %>% 
+  ggplot(aes(release_year, n)) +
+  geom_line()
+
+annual_data %>% 
+  ggplot(aes(release_year, popularity)) +
+  geom_line()
+
+# Probably popularity measure is different in 2021 and 2022
+horror_movies %>% 
+  filter(runtime >= 60) %>% 
+  mutate(release_year = year(release_date)) %>% 
+  filter(release_year > 2020) %>% View()
+
+annual_data %>% 
+  ggplot(aes(release_year, vote_count)) +
+  geom_line()
+
+annual_data %>% 
+  ggplot(aes(release_year, vote_average)) +
+  geom_line()
+
+annual_data %>% 
+  ggplot(aes(release_year, weighted_vote_average)) +
+  geom_line()
+
+horror_movies %>% 
+  filter(runtime >= 60, vote_count > 1000) %>% 
+  ggplot(aes(release_date, vote_average)) +
+  geom_point(aes(alpha = vote_count)) +
+  scale_y_continuous(limits = c(0, 10))
+
+voted_many_movies <- horror_movies %>% 
+  filter(vote_count >= 10, budget > 0.1)
+
+p <- voted_many_movies %>% 
+  ggplot(aes(vote_count, vote_average)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = "lm", se = FALSE) +
+  scale_x_log10() +
+  scale_y_continuous(limits = c(0, 10)) +
+  labs(title = "Vote average increases 0.85 points as vote counts are multiplied by 10",
+       subtitle = "Among the horror movies whose budget is more than 100 thousand dollars and\nvote counts are equal to or more than 10",
+       x = "Vote counts", y = "Vote average",
+       caption = "Source: The Movie Database")
+
+lm(vote_average ~ log10(vote_count), data = voted_many_movies) %>% 
+  summary()
+
+horror_movies %>% 
+  filter(runtime >= 60) %>% 
+  ggplot(aes(budget)) +
+  geom_histogram() +
+  geom_vline(xintercept = 1) +
+  scale_x_log10()
+
+horror_movies %>% 
+  filter(runtime >= 60) %>% 
+  ggplot(aes(revenue)) +
+  geom_histogram() +
+  scale_x_log10()
+  
+annual_data %>% 
+  ggplot(aes(release_year, budget)) +
+  geom_line()
+
+annual_data %>% 
+  ggplot(aes(release_year, revenue)) +
+  geom_line()
+
+annual_data %>% 
+  ggplot(aes(release_year, runtime)) +
+  geom_line()
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/horro_movies.png", p, width = 8, height = 6)
+
+```
