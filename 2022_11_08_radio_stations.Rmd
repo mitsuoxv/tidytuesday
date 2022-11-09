@@ -1,0 +1,167 @@
+---
+title: "Radio Stations"
+date: 2022-11-09
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(lubridate)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-11-08")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+state_stations <- tt$state_stations
+station_info <- tt$station_info
+
+stations <- state_stations %>% 
+  left_join(station_info, by = "call_sign", suffix = c("", "_info")) %>% 
+  separate(frequency, c("freq", "band"), sep = "\\s+") %>% 
+  mutate(
+    freq = as.numeric(freq),
+    band = if_else(!is.na(band), band,
+                        if_else(freq < 200, "FM", "AM")),
+    state = str_replace_all(state, "_", " ")
+  )
+```
+
+```{r}
+skimr::skim(stations)
+```
+
+```{r}
+stations %>% 
+  count(band)
+
+stations %>% 
+  filter(!is.na(licensee_info)) %>% 
+  select(licensee, licensee_info) %>% View()
+
+stations %>% 
+  count(state, sort = TRUE)
+
+stations %>% 
+  count(state, city, sort = TRUE)
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+stations %>% 
+  filter(band == "AM") %>% 
+  ggplot(aes(freq)) +
+  geom_histogram(binwidth = 10, boundary = 0)
+
+stations %>% 
+  filter(band == "AM") %>% 
+  count(as.integer(freq / 10), sort = TRUE)
+
+stations %>% 
+  filter(band == "FM") %>% 
+  ggplot(aes(freq)) +
+  geom_histogram(binwidth = 0.1, boundary = 0)
+
+stations %>% 
+  filter(band == "FM") %>% 
+  count(as.integer(freq * 10), sort = TRUE)
+
+stations %>% 
+  filter(state %in% c("Texas", "California", "Florida", "New York")) %>% 
+  mutate(freq = if_else(band == "AM", freq / 10, freq * 10)) %>% 
+  ggplot(aes(freq)) +
+  geom_histogram(binwidth = 1, boundary = 0) +
+  facet_grid(vars(state), vars(band), scales = "free_x")
+
+stations %>% 
+  filter(city %in% c("Houston", "Chicago", "Los Angeles", "New York City")) %>% 
+  mutate(freq = if_else(band == "AM", freq / 10, freq * 10)) %>% 
+  ggplot(aes(freq)) +
+  geom_histogram(binwidth = 1, boundary = 0) +
+  facet_grid(vars(city), vars(band), scales = "free_x")
+
+stations %>% 
+  filter(state %in% c("New York", "New Jersey")) %>% 
+  count(state, city, sort = TRUE)
+
+p <- stations %>% 
+  filter(city %in% c("New York City", "Newark")) %>% 
+  mutate(freq = if_else(band == "AM", freq / 10, freq * 10)) %>% 
+  ggplot(aes(freq)) +
+  geom_histogram(binwidth = 1, boundary = 0) +
+  scale_y_continuous(limits = c(0, 1), breaks = 0:1) +
+  facet_grid(vars(city), vars(band), scales = "free_x") +
+  labs(x = "Frequency (divided by 10 for AM, and multiplied by 10 for FM)",
+       y = NULL,
+       title = "Radio station frequency looks neatly distributed between nearby cities\nlike New York City and Newark by FCC",
+       caption = "Source: Wikipedia")
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/ratio_stations.png", p, width = 7, height = 4)
+
+```
