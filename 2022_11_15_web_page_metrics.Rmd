@@ -1,0 +1,184 @@
+---
+title: "Web page metrics"
+date: 2022-11-15
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(lubridate)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+image_alt <- readr::read_csv('https://raw.githubusercontent.com/zakvarty/tidytuesday/page-metrics-data-fix/data/2022/2022-11-15/image_alt.csv')
+color_contrast <- readr::read_csv('https://raw.githubusercontent.com/zakvarty/tidytuesday/page-metrics-data-fix/data/2022/2022-11-15/color_contrast.csv')
+ally_scores <- readr::read_csv('https://raw.githubusercontent.com/zakvarty/tidytuesday/page-metrics-data-fix/data/2022/2022-11-15/ally_scores.csv')
+bytes_total <- readr::read_csv('https://raw.githubusercontent.com/zakvarty/tidytuesday/page-metrics-data-fix/data/2022/2022-11-15/bytes_total.csv')
+speed_index <- readr::read_csv('https://raw.githubusercontent.com/zakvarty/tidytuesday/page-metrics-data-fix/data/2022/2022-11-15/speed_index.csv')
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+glimpse(ally_scores)
+ally_scores <- ally_scores %>% 
+  mutate(
+    date = as.Date(date, "%Y_%m_%d"),
+    timestamp = as_datetime(timestamp / 1e3)
+    )
+
+glimpse(image_alt)
+image_alt <- image_alt %>% 
+  mutate(
+    date = as.Date(date, "%Y_%m_%d"),
+    timestamp = as_datetime(timestamp / 1e3)
+    ) %>% 
+  rename(p50 = percent)
+
+glimpse(color_contrast)
+color_contrast <- color_contrast %>% 
+  mutate(
+    date = as.Date(date, "%Y_%m_%d"),
+    timestamp = as_datetime(timestamp / 1e3)
+    ) %>% 
+  rename(p50 = percent)
+
+glimpse(bytes_total)
+bytes_total <- bytes_total %>% 
+  mutate(
+    date = as.Date(date, "%Y_%m_%d"),
+    timestamp = as_datetime(timestamp / 1e3)
+    )
+
+glimpse(speed_index)
+speed_index <- speed_index %>% 
+  mutate(
+    date = as.Date(date, "%Y_%m_%d"),
+    timestamp = as_datetime(timestamp / 1e3)
+    )
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+range(bytes_total$date)
+range(speed_index$date)
+
+range(color_contrast$date)
+range(image_alt$date)
+range(ally_scores$date)
+
+ally_measures <- bind_rows(ally_scores, image_alt, color_contrast)
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+ally_measures %>% 
+  count(client)
+
+ally_measures %>% 
+  filter(client == "mobile") %>% 
+  mutate(
+    measure = measure %>% 
+      str_remove("a11y") %>% 
+      str_replace_all("([[:upper:]])", " \\1") %>% 
+      str_trim()
+    ) %>% 
+  ggplot(aes(x = date)) +
+  geom_ribbon(aes(ymin = p10, ymax = p90), fill = "gray80") +
+  geom_ribbon(aes(ymin = p25, ymax = p75), fill = "gray50") +
+  geom_line(aes(y = p50), color = "blue", size = 1) +
+  scale_y_continuous(limits = c(0, 100), expand = c(0, 0)) +
+  facet_wrap(vars(measure), nrow = 1) +
+  labs(x = NULL, y = NULL,
+       title = "Web pages have been improving since 2018",
+       subtitle = "Client is mobile. Shaded areas are 10-90% and 25-75% quantiles",
+       caption = "Source: httparchive.org by way of Data is Plural")
+
+ally_measures %>% 
+  filter(client == "desktop") %>% 
+  mutate(
+    measure = measure %>% 
+      str_remove("a11y") %>% 
+      str_replace_all("([[:upper:]])", " \\1") %>% 
+      str_trim()
+    ) %>% 
+  ggplot(aes(x = date)) +
+  geom_ribbon(aes(ymin = p10, ymax = p90), fill = "gray80") +
+  geom_ribbon(aes(ymin = p25, ymax = p75), fill = "gray50") +
+  geom_line(aes(y = p50), color = "blue", size = 1) +
+  scale_y_continuous(limits = c(0, 100), expand = c(0, 0)) +
+  facet_wrap(vars(measure), nrow = 1) +
+  labs(x = NULL, y = NULL)
+
+p <- bytes_total %>% 
+  ggplot(aes(x = date)) +
+  geom_ribbon(aes(ymin = p10, ymax = p90), fill = "gray80") +
+  geom_ribbon(aes(ymin = p25, ymax = p75), fill = "gray50") +
+  geom_line(aes(y = p50), color = "blue", size = 1) +
+  scale_y_log10() +
+  facet_wrap(vars(client), nrow = 1) +
+  labs(x = NULL, y = "KB (log scale)",
+       title = "Web pages are getting larger, but pace is decelerating in log scale",
+       subtitle = "Shaded areas are 10-90% and 25-75% quantiles",
+       caption = "Source: httparchive.org by way of Data is Plural")
+
+speed_index %>% 
+  ggplot(aes(x = date)) +
+  geom_ribbon(aes(ymin = p10, ymax = p90), fill = "gray80") +
+  geom_ribbon(aes(ymin = p25, ymax = p75), fill = "gray50") +
+  geom_line(aes(y = p50), color = "blue", size = 1) +
+  facet_wrap(vars(client), nrow = 1) +
+  labs(x = NULL, y = NULL)
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/web_page_metrics.png", p, width = 7, height = 4)
+
+```
