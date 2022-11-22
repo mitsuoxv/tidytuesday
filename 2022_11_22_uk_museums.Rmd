@@ -143,7 +143,7 @@ p <- museums %>%
   facet_wrap(vars(status), ncol = 1) +
   labs(x = "Area deprivation index", y = "Proportion",
        title = "Closed museums tend to have lower area deprivation index in England",
-       subtitle = "( ) denotes # of museums, and red line denotes mean index",
+       subtitle = "( ) denotes # of museums, and red line denotes mean index.\nThe index ranges from 1 (most deprived) to 10 (least deprived)",
        caption = "Source: Data downloaded from the Mapping Museums website at www.mappingmuseums.org,\nAccessed on 2022-11-22")
 ```
 
