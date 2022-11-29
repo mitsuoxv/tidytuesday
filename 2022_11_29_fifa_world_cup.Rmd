@@ -104,7 +104,7 @@ wcmatches2 <- wcmatches %>%
   mutate(
     team1_score = if_else(team1 == home_team_bk, home_score, away_score),
     team2_score = if_else(team2 == home_team_bk, home_score, away_score),
-    team1_diff = team1_score - team2_score
+    team2_diff = team2_score - team1_score
   )
 
 match_freq <- wcmatches2 %>% 
@@ -114,13 +114,13 @@ match_freq <- wcmatches2 %>%
 
 p <- wcmatches2 %>% 
   filter(match %in% match_freq) %>% 
-  ggplot(aes(team1_diff)) +
+  ggplot(aes(team2_diff)) +
   geom_histogram() +
   geom_vline(xintercept = 0, color = "red", lty = 3) +
   scale_x_continuous(breaks = -4:6) +
   scale_y_continuous(breaks = c(0, 5)) +
   facet_wrap(vars(match), ncol = 3) +
-  labs(x = "LHS score - RHS score", y = "Count",
+  labs(x = "RHS score - LHS score", y = "Count",
        title = "Argentina always beat Nigeria by 1 point margin in the past",
        subtitle = ">=5 matches in the World Cup. Teams are alphabetical order.",
        caption = "Note: Germany includes West Germany\nSource: Kaggle FIFA World Cup") +
