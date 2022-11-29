@@ -117,7 +117,7 @@ p <- wcmatches2 %>%
   ggplot(aes(team2_diff)) +
   geom_histogram() +
   geom_vline(xintercept = 0, color = "red", lty = 3) +
-  scale_x_continuous(breaks = -4:6) +
+  scale_x_continuous(breaks = -6:4) +
   scale_y_continuous(breaks = c(0, 5)) +
   facet_wrap(vars(match), ncol = 3) +
   labs(x = "RHS score - LHS score", y = "Count",
