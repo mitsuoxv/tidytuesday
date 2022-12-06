@@ -1,0 +1,187 @@
+---
+title: "Elevators"
+date: 2022-12-06
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event! Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data. While the dataset will be "tamed", it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format. The goal of TidyTuesday is to apply your R skills, get feedback, explore other's work, and connect with the greater #RStats community! As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(lubridate)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+elevators <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-12-06/elevators.csv') %>% 
+  janitor::clean_names()
+
+problems(elevators) %>% 
+  print(n = 38)
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+glimpse(elevators)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+elevators <- elevators %>% 
+  mutate(
+    across(ends_with("_date"), ymd),
+    dv_floor_to = dv_floor_to %>% 
+      str_extract("[0-9]+") %>% 
+      as.numeric(),
+    dv_speed_fpm = as.numeric(dv_speed_fpm),
+    dv_capacity_lbs = as.numeric(dv_capacity_lbs),
+    dv_travel_distance = parse_number(dv_travel_distance)
+  )
+
+skimr::skim(elevators)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+elevators %>% 
+  count(device_status, sort = TRUE)
+
+elevators %>% 
+  count(dv_device_status_description, sort = TRUE)
+
+elevators %>% 
+  count(borough, sort = TRUE)
+
+```
+
+```{r}
+elevators %>% 
+  ggplot(aes(dv_lastper_insp_date)) +
+  geom_histogram()
+
+elevators %>% 
+  filter(dv_approval_date >= "1970-01-01") %>% 
+  ggplot(aes(dv_approval_date)) +
+  geom_histogram() +
+  facet_wrap(vars(dv_device_status_description))
+
+elevators %>% 
+  filter(dv_status_date > "1920-01-01") %>% 
+  ggplot(aes(dv_status_date)) +
+  geom_histogram()
+
+```
+
+```{r}
+elevators %>% 
+  count(dv_lastper_insp_disp, sort = TRUE)
+
+elevators %>% 
+  count(dv_manufacturer, sort = TRUE)
+
+elevators %>% 
+  count(dv_travel_distance, sort = TRUE)
+
+elevators %>% 
+  count(dv_speed_fpm, sort = TRUE)
+
+elevators %>% 
+  count(dv_car_buffer_type, sort = TRUE)
+
+elevators %>% 
+  count(dv_governor_type, sort = TRUE)
+
+elevators %>% 
+  count(dv_machine_type, sort = TRUE)
+
+elevators %>% 
+  count(dv_safety_type, sort = TRUE)
+
+elevators %>% 
+  count(dv_mode_operation, sort = TRUE)
+
+elevators %>% 
+  count(dv_floor_from, sort = TRUE)
+
+elevators %>% 
+  count(dv_floor_to, sort = TRUE)
+
+elevators %>% 
+  count(device_type, sort = TRUE)
+
+p <- elevators %>% 
+  filter(
+    device_type == "Passenger Elevator (P)",
+    device_status == "A"
+    ) %>% 
+  filter(dv_floor_to < 150, dv_speed_fpm < 4000) %>% 
+  ggplot(aes(dv_floor_to, dv_speed_fpm)) +
+  geom_point(alpha = 1/10) +
+  geom_smooth(method = 'gam', formula = y ~ s(x, bs = "cs"), se = FALSE) +
+  scale_y_continuous(labels = comma) +
+  labs(x = "Highest floor", y = "Elevator speed (feet per minute)",
+       title = "Taller buildings, up to 50 floors, tend to have faster elevators",
+       subtitle = "Among active passenger elavators in NYC",
+       caption = "Source: [Elevators data package](https://emilhvitfeldt.github.io/elevators/)")
+```
+
+```{r}
+elevators %>% 
+  filter(
+    device_type == "Passenger Elevator (P)",
+    device_status == "A"
+    ) %>% 
+  filter(dv_floor_to < 150) %>% 
+  ggplot(aes(dv_floor_to, dv_capacity_lbs)) +
+  geom_point(alpha = 1/5) +
+  scale_y_log10()
+
+```
+
+```{r}
+elevators %>% 
+  filter(
+    device_type == "Passenger Elevator (P)",
+    device_status == "A"
+    ) %>% 
+  filter(dv_floor_to < 150, dv_travel_distance < 5000) %>% 
+  ggplot(aes(dv_floor_to, dv_travel_distance)) +
+  geom_point(alpha = 1/5) +
+  geom_smooth(method = "lm")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter!
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/elevators.png", p, width = 7, height = 5)
+
+```
