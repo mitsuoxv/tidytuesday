@@ -1,0 +1,157 @@
+---
+title: "Monthly State Retail Sales"
+date: 2022-12-13
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(lubridate)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-12-13")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+state_retail <- tt$state_retail
+coverage_codes <- tt$coverage_codes
+
+```
+
+```{r}
+skimr::skim(state_retail)
+```
+
+27456 = 52 * 12 * 44
+
+52: 50 states + DC and USA
+12 subsectors, including total
+44 months from 2019 Jan to 2022 Aug
+
+```{r}
+state_retail %>% 
+  count(fips, state_abbr, sort = TRUE)
+
+state_retail %>% 
+  count(subsector, sort = TRUE)
+
+```
+
+```{r}
+library(tsibble)
+
+state_retail <- state_retail %>% 
+  mutate(
+    time = make_yearmonth(year, month),
+    across(starts_with("change_yoy"), as.numeric)
+    )
+
+state_retail_ts <- state_retail %>% 
+  select(-fips, -naics, -year, -month) %>% 
+  as_tsibble(key = c(state_abbr, subsector), index = time)
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+library(fable)
+library(feasts)
+
+usa_total <- state_retail_ts %>% 
+  filter(state_abbr == "USA", subsector == "total")
+
+usa_total %>% 
+  autoplot(change_yoy)
+
+usa_total %>% 
+  gg_season(change_yoy, labels = "both")
+```
+
+```{r}
+state_retail_ts %>% 
+  filter(state_abbr %in% c("NY", "CA", "TX", "FL"), subsector == "total") %>% 
+  gg_subseries(change_yoy) +
+  scale_y_continuous(limits = c(-40, 70))
+  
+```
+
+```{r}
+p <- state_retail_ts %>% 
+  filter(state_abbr == "USA",
+         subsector %in% c("Food and Beverage", "Health and Personal Care", "Electronics and Appliances")) %>% 
+  mutate(
+    subsector = subsector %>% 
+      str_wrap(width = 15)
+    ) %>% 
+  gg_subseries(change_yoy) +
+  labs(x = NULL, y = "Retail sales change\n(YoY, percentage)",
+       title = "Covid-19 increased demands for electronics and appliances in 2021,\nprompted panic buying of food and beverage in March 2020,\nand reduced health and personal care spending in April and May of 2020",
+       caption = "Source: US Census Bureau's Monthly State Retail Sales") +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(color = "black"))
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/state_retail_sales.png", p, width = 8, height = 5)
+
+```
