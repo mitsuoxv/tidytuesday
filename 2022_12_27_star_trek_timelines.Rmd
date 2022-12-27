@@ -1,0 +1,165 @@
+---
+title: "Star Trek Timelines"
+date: 2022-12-27
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(lubridate)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2022-12-27")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+tlBooks <- tt$tlBooks
+tlFootnotes <- tt$tlFootnotes
+
+skimr::skim(tlBooks)
+skimr::skim(tlFootnotes)
+```
+
+```{r}
+tlBooks %>% 
+  count(series, sort = TRUE)
+
+tlBooks %>% 
+  count(format, series, sort = TRUE)
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+Looks like TOS -> TNG -> VOY
+
+```{r Visualize}
+
+tlBooks %>% 
+  filter(
+    series %in% c("TNG", "TOS", "VOY", "DS9", "ENT", "ST")
+    ) %>% 
+  ggplot(aes(stardate_start)) +
+  geom_histogram() +
+  facet_wrap(vars(series))
+  
+```
+
+https://en.wikipedia.org/wiki/Star_Trek
+
+TOS: The Original Series
+TNG: The Next Generation
+DS9: Deep Space Nine
+VOY: Voyager
+ENT: Enterprise
+ST: Short Treks
+
+```{r}
+tlBooks %>% 
+  filter(format == "episode", series == "TOS") %>% View()
+```
+
+I don't notice any characteristics of title word by series. Maybe number of words is too small.
+
+```{r}
+library(tidytext)
+
+tlBooks %>% 
+  filter(series %in% c("TOS", "TNG", "VOY")) %>% 
+  select(title, series) %>% 
+  unnest_tokens(word, title) %>% 
+  anti_join(get_stopwords()) %>% 
+  count(series, word) %>% 
+  bind_tf_idf(word, series, n) %>% 
+  group_by(series) %>% 
+  slice_max(tf_idf, n = 5) %>% View()
+```
+
+So, I turn to footnotes.
+
+```{r}
+p <- tlBooks %>% 
+  filter(series %in% c("TOS", "TNG")) %>% 
+  left_join(tlFootnotes, by = "footnote") %>% 
+  filter(!is.na(footnote)) %>% 
+  select(text, series) %>% 
+  unnest_tokens(word, text) %>% 
+  filter(!word %in% c("tng", "tos")) %>% 
+  count(series, word) %>% 
+  bind_tf_idf(word, series, n) %>% 
+  group_by(series) %>% 
+  slice_max(tf_idf, n = 9) %>% 
+  mutate(word = reorder_within(word, tf_idf, series)) %>% 
+  ggplot(aes(tf_idf, word)) +
+  geom_col(aes(fill = series), show.legend = FALSE) +
+  scale_y_reordered() +
+  facet_wrap(vars(series), scales = "free_y") +
+labs(x = "Tf-idf of footnote words by series", y = NULL,
+     title = "You can see Picard in The Next Generation, and\nKirk and Spock in The Original Series in footnotes",
+   caption = "Source: {rtrek} package")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/star_trek_timelines.png", p, width = 6, height = 4)
+
+```
