@@ -1,0 +1,261 @@
+---
+title: "Alone data"
+date: 2023-01-24
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(lubridate)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+library(ggrepel)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2023-01-24")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+survivalists <- tt$survivalists
+loadouts <- tt$loadouts
+episodes <- tt$episodes
+seasons <- tt$seasons |> 
+  mutate(location = str_trim(location))
+```
+
+```{r}
+skimr::skim(survivalists)
+```
+
+```{r}
+survivalists |> 
+  count(gender, sort = TRUE)
+```
+
+```{r}
+skimr::skim(seasons)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+survivalists |> 
+  ggplot(aes(days_lasted)) +
+  geom_histogram(binwidth = 25, boundary = 0) +
+  scale_y_continuous(breaks = c(0, 5)) +
+  facet_grid(row = vars(season)) +
+  theme(panel.grid.minor.y = element_blank())
+```
+
+```{r}
+map_data("world") |> 
+  filter(lat > -60) |> 
+  ggplot(aes(long, lat)) +
+  geom_point(size = 0.1, color = "gray70") +
+  geom_point(aes(lon, lat), data = seasons, color = "red") +
+  geom_text_repel(aes(lon, lat, label = season), data = seasons, color = "red") +
+  coord_map()
+```
+
+```{r}
+survivalists |> 
+  left_join(seasons |> unite("location", c(location, country), sep = ", "),
+            by = "season") |> 
+  ggplot(aes(age, days_lasted)) +
+  geom_point(aes(color = gender)) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(vars(location))
+```
+
+Season 5 (Mongolia) is for the second time participants.
+
+```{r}
+loadouts |> 
+  count(item, sort = TRUE)
+
+experienced <- survivalists |> 
+  count(name, sort = TRUE) |> 
+  filter(n > 1) |> 
+  pull(name)
+
+survivalists |> 
+  filter(name %in% experienced) |> 
+  count(season, sort = TRUE)
+
+survivalists |> 
+  filter(season == 5, name %in% experienced)
+
+survivalists |> 
+  filter(name %in% experienced) |> 
+  mutate(times = if_else(season == 5, "second_trial", "first_trial")) |> 
+  select(name, times, days_lasted) |> 
+  pivot_wider(names_from = times, values_from = days_lasted) |> 
+  ggplot(aes(first_trial, second_trial)) +
+  geom_point() +
+  geom_text_repel(aes(label = name)) +
+  scale_x_continuous(limits = c(0, 100)) +
+  scale_y_continuous(limits = c(0, 100))
+```
+
+What separates Brad Richardson and Sam Larson?
+
+```{r}
+# in Quatsino, Canada
+# Sleeping bag, Knife, Bow and arrows, Ferro rod and Slingshot
+loadouts |> 
+  filter(name %in% c("Brad Richardson", "Sam Larson")) |>
+  count(season, name, item, sort = TRUE) |> 
+  filter(season != 5) |> 
+  ggplot(aes(n, item)) +
+  geom_col() +
+  facet_wrap(vars(name))
+
+# in Mongolia
+# Pot, Paracord and Multitool
+loadouts |> 
+  filter(name %in% c("Brad Richardson", "Sam Larson")) |>
+  count(season, name, item, sort = TRUE) |> 
+  filter(season == 5) |> 
+  ggplot(aes(n, item)) +
+  geom_col() +
+  facet_wrap(vars(name))
+```
+
+w/o sleeping bag are all season 4.
+
+```{r}
+sleeping_bag_holders <- loadouts |> 
+  filter(item == "Sleeping bag")
+
+survivalists |> 
+  anti_join(sleeping_bag_holders, by = c("season", "name")) |> View()
+```
+
+
+```{r}
+surv_loadouts <- survivalists |> 
+  left_join(loadouts, by = c("season", "name"))
+
+# In season 4, teams can share items
+surv_loadouts_s4 <- survivalists |> 
+  filter(season == 4) |> 
+  left_join(
+    surv_loadouts |> 
+      filter(season == 4) |> 
+      select(team, item),
+    by = "team"
+  )
+
+surv_loadouts2 <- surv_loadouts |> 
+  filter(season != 4) |> 
+  bind_rows(surv_loadouts_s4)
+
+load_lacking <- surv_loadouts2 |> 
+  left_join(seasons, by = "season", suffix = c("", "_loc")) |> 
+  filter(country_loc == "Canada") |> 
+  count(season, name, days_lasted, item) |> 
+  pivot_wider(names_from = item, values_from = n) |> 
+  mutate(across(where(is.integer), is.na)) |> 
+  pivot_longer(where(is.logical), names_to = "item", values_to = "lacking")
+```
+
+```{r}
+holding_items <- load_lacking |> 
+  group_by(item) |> 
+  summarize(
+    n = n(),
+    holding = sum(!lacking),
+    holding_ratio = holding / n
+  ) 
+
+holding_items |> 
+  mutate(item = fct_reorder(item, holding_ratio)) |> 
+  ggplot(aes(holding_ratio, item)) +
+  geom_col()
+
+freq_holding <- holding_items |> 
+  filter(holding_ratio > 0.5) |> 
+  arrange(desc(holding_ratio)) |> 
+  pull(item)
+```
+
+```{r}
+p <- load_lacking |> 
+  filter(item %in% freq_holding) |> 
+  mutate(
+    item = fct_relevel(item, freq_holding) |> fct_rev(),
+    holding = if_else(lacking, "No", "Yes")
+    ) |> 
+  ggplot(aes(days_lasted, item, color = holding)) +
+  geom_boxplot() +
+  geom_point(alpha = 1/3) +
+  guides(color = guide_legend(reverse = TRUE)) +
+  labs(color = "Load",
+       x = "Survival days", y = "Items more than half participants load",
+       title = "Not loading ferro rod, sleeping bag and paracord is damaging",
+       subtitle = "In seasons located in Canada",
+     caption = "Source: Alone data package by Dan Oehm") 
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/alone_data.png", p, width = 7, height = 6)
+
+```
