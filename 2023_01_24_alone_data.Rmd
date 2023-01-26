@@ -231,15 +231,15 @@ freq_holding <- holding_items |>
 ```
 
 ```{r}
-p <- load_lacking |> 
-  filter(item %in% freq_holding) |> 
+p <- load_lacking |>
+  filter(item %in% freq_holding) |>
   mutate(
     item = fct_relevel(item, freq_holding) |> fct_rev(),
     holding = if_else(lacking, "No", "Yes")
-    ) |> 
+    ) |>
   ggplot(aes(days_lasted, item, color = holding)) +
   geom_boxplot() +
-  geom_point(alpha = 1/3) +
+  geom_point(position = position_dodge(width = 0.8), alpha = 1/3) +
   guides(color = guide_legend(reverse = TRUE)) +
   labs(color = "Load",
        x = "Survival days", y = "Items more than half participants load",
