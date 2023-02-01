@@ -1,0 +1,321 @@
+---
+title: "Pet Cats UK"
+date: 2023-02-01
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(lubridate)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2023-01-31")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+cats_uk <- tt$cats_uk
+cats_uk_reference <- tt$cats_uk_reference
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+cats_uk |> 
+  count(tag_id, sort = TRUE)
+
+cats_uk |> 
+#  filter(tag_id == "Gracie_2-Tag") |> 
+  ggplot(aes(location_long, location_lat)) +
+  geom_point(alpha = 1/10)
+```
+
+Cats are concentrated in the South West in the UK.
+
+```{r}
+map_data("world", "uk") |> 
+  ggplot(aes(long, lat)) +
+  geom_polygon(aes(group = group), fill = "gray90") +
+  geom_point(aes(location_long, location_lat), data = cats_uk, alpha = 1/5) +
+  coord_map()
+```
+
+Most cats don't move much.
+
+```{r}
+cats_uk |> 
+  group_by(tag_id) |> 
+  summarize(
+    max_long = max(location_long),
+    min_long = min(location_long),
+    max_lat = max(location_lat),
+    min_lat = min(location_lat),
+    .groups = "drop"
+  ) |> 
+  mutate(max_area = (max_long - min_long) * (max_lat - min_lat)) |> 
+  arrange(desc(max_area))
+```
+
+Follow "Mifty-Tag"in long and lat, and find one time travel.
+
+```{r}
+cats_uk |> 
+  filter(tag_id == "Mifty-Tag") |> 
+  pivot_longer(location_long:location_lat, names_to = "long_lat") |> 
+  ggplot(aes(timestamp, value)) +
+  geom_line() +
+  facet_wrap(vars(long_lat), ncol = 1, scales = "free_y")
+```
+
+Height
+
+```{r}
+cats_uk |> 
+  group_by(tag_id) |> 
+  summarize(
+    height_move = max(height_above_ellipsoid) - min(height_above_ellipsoid),
+    .groups = "drop") |> 
+  arrange(desc(height_move))
+```
+
+Follow "Gracie_2-Tag", and find her fly. Or record error?
+
+```{r}
+cats_uk |> 
+  filter(tag_id == "Gracie_2-Tag") |> 
+  ggplot(aes(timestamp, height_above_ellipsoid)) +
+  geom_line()
+
+cats_uk_reference |> 
+  filter(tag_id == "Gracie_2-Tag") |> View()
+```
+
+Filter visible, and no more 8000 meters high.
+
+```{r}
+cats_uk |> 
+  filter(visible) |> 
+  group_by(tag_id) |> 
+  summarize(
+    height_move = max(height_above_ellipsoid) - min(height_above_ellipsoid),
+    .groups = "drop") |> 
+  arrange(desc(height_move))
+```
+
+Follow visible "Dexter2-Tag", but still dubious
+
+```{r}
+cats_uk |> 
+  filter(visible, tag_id == "Dexter2-Tag") |> 
+  ggplot(aes(timestamp, height_above_ellipsoid)) +
+  geom_line()
+
+cats_uk_reference |> 
+  filter(tag_id == "Dexter2-Tag") |> View()
+```
+
+Ground speed. Very dubious.
+1000 m/s = 1 km/s = 60 km/m = 3600 km/h
+
+```{r}
+cats_uk |> 
+  filter(visible) |> 
+  arrange(desc(ground_speed))
+
+cats_uk |> 
+  filter(visible) |> 
+  ggplot(aes(ground_speed)) +
+  geom_histogram() +
+  scale_x_log10()
+```
+
+Reference
+
+Felis catus only
+```{r}
+cats_uk_reference |> 
+  count(animal_taxon, sort = TRUE)
+```
+
+81 out of 101 are allowed to hunt.
+
+```{r}
+cats_uk_reference |> 
+  count(hunt)
+```
+
+```{r}
+cats_uk_reference |> 
+  filter(hunt) |> 
+  ggplot(aes(prey_p_month)) +
+  geom_histogram()
+```
+
+Most are fixed.
+
+```{r}
+cats_uk_reference |> 
+  count(animal_reproductive_condition)
+```
+
+Male and female almost half.
+
+```{r}
+cats_uk_reference |> 
+  count(animal_sex)
+```
+
+Male stays less indoors than female.
+
+```{r}
+cats_uk_reference |> 
+  ggplot(aes(hrs_indoors)) +
+  geom_histogram(aes(fill = animal_sex))
+```
+
+```{r}
+cats_uk_reference |> 
+  ggplot(aes(n_cats)) +
+  geom_histogram(aes(fill = animal_sex))
+```
+
+```{r}
+cats_uk_reference |> 
+  count(food_dry)
+
+cats_uk_reference |> 
+  count(food_wet)
+
+cats_uk_reference |> 
+  count(food_other)
+```
+
+UK only for sure.
+```{r}
+cats_uk_reference |> 
+  count(study_site)
+```
+
+Male tends to be younger.
+
+```{r}
+cats_uk_reference |> 
+  filter(!is.na(age_years)) |> 
+  ggplot(aes(age_years)) +
+  geom_histogram(aes(fill = animal_sex), binwidth = 1,
+                 position = position_dodge(width = 0.8)) +
+  scale_y_continuous(breaks = 0:10) +
+  theme(panel.grid.minor.y = element_blank())
+```
+
+Among 3 yr old male, allowed to hunt,
+"Indie-Tag" and "Tigger-Tag" are lazy
+"Carrots-Tag" and "Ginge-Tag" are eager to hunt.
+
+```{r}
+cats_uk_reference |> 
+  filter(age_years == 3, hunt) |> 
+  ggplot(aes(prey_p_month)) +
+  geom_histogram(aes(fill = animal_sex))
+
+lazy_eager_3yr_male <- cats_uk_reference |> 
+  filter(age_years == 3, hunt, animal_sex == "m") |> 
+  filter(prey_p_month == 0.5 | prey_p_month == 17.5) |> 
+  pull(tag_id)
+
+```
+
+"Carrots-Tag" and "Ginge-Tag" may live in higher floor.
+
+```{r}
+cats_uk |> 
+  filter(tag_id %in% lazy_eager_3yr_male, visible) |> 
+  ggplot(aes(timestamp, height_above_ellipsoid)) +
+  geom_line(aes(color = tag_id))
+```
+
+All four cats not move much.
+
+```{r}
+p <- cats_uk |> 
+  filter(tag_id %in% lazy_eager_3yr_male, visible) |> 
+  group_by(tag_id) |> 
+  mutate(
+    long = location_long - min(location_long),
+    lat = location_lat - min(location_lat)
+  ) |> 
+  ungroup() |> 
+  left_join(cats_uk_reference, by = "tag_id") |> 
+  mutate(tag_id = glue::glue("{tag_id} ({prey_p_month})")) |> 
+  ggplot(aes(long, lat)) +
+  geom_point(alpha = 1/5) +
+  facet_wrap(vars(tag_id)) +
+  labs(x = "Relative longitude", y = "Relative latitude",
+       title = "Eager hunters move in wider area",
+       subtitle = "( ) denotes # of prey caught per month\nmost and least eager hunters among 3 yr old male",
+     caption = "Source: Movebank for Animal Tracking Data via Data is Plural")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/pet_cats_uk.png", p, width = 5, height = 4)
+
+```
