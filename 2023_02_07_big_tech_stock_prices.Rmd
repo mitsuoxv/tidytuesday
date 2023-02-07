@@ -1,0 +1,130 @@
+---
+title: "Big Tech Stock Prices"
+date: 2023-02-07
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(lubridate)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+library(ggrepel)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+big_tech_stock_prices <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-02-07/big_tech_stock_prices.csv')
+
+big_tech_companies <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-02-07/big_tech_companies.csv')
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+glimpse(big_tech_stock_prices)
+glimpse(big_tech_companies)
+
+skimr::skim(big_tech_stock_prices)
+skimr::skim(big_tech_companies)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+big_tech_companies <- big_tech_companies |> 
+  mutate(
+    company = company |> 
+      str_remove(", Inc.") |> 
+      str_remove(" Inc.| Corporation")
+  )
+
+big_tech_companies <- big_tech_companies |> 
+  mutate(company = if_else(company == "International Business Machines", "IBM", company))
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+big_tech_stock_prices |> 
+  ggplot(aes(date, adj_close)) +
+  geom_line(aes(color = stock_symbol))
+  
+```
+
+```{r}
+annual_yields <- big_tech_stock_prices |> 
+  mutate(year = year(date)) |> 
+  group_by(stock_symbol, year) |> 
+  summarize(yield = adj_close[which.max(date)] / adj_close[which.min(date)] - 1,
+            .groups = "drop")
+
+annual_yields |> 
+  left_join(big_tech_companies, by = "stock_symbol") |> 
+  mutate(positive = yield > 0) |> 
+  ggplot(aes(yield)) +
+  geom_histogram(aes(fill = positive), boundary = 0, binwidth = 0.2) +
+  facet_wrap(vars(company))
+```
+
+```{r}
+p <- annual_yields |> 
+  group_by(stock_symbol) |> 
+  summarize(
+    mean = mean(yield),
+    sd = sd(yield)
+  ) |> 
+  left_join(big_tech_companies, by = "stock_symbol") |> 
+  ggplot(aes(sd, mean)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_text_repel(aes(label = company)) +
+  scale_x_log10(labels = percent) +
+  scale_y_log10(labels = percent) +
+  labs(x = "Standard deviation (log scale)",
+       y = "Mean (log scale)",
+       title = "High risk, high return in big tech stocks",
+       subtitle = "Annual yields from 2010 to 2022",
+   caption = "Source: Yahoo Finance via Kaggle (by Evan Gower)")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/big_tech_stocks.png", p, width = 5, height = 4)
+
+```
