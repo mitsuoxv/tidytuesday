@@ -174,9 +174,9 @@ p <- ggdraw() +
   draw_plot(p1) +
   draw_image(double_black_white$img_src[1],
            x = -0.25, y = 0, scale = 0.2) +
-  draw_image(double_black_white$img_src[2],
-           x = 0.03, y = -0.1, scale = 0.2) +
   draw_image(double_black_white$img_src[3],
+           x = 0.03, y = -0.1, scale = 0.2) +
+draw_image(double_black_white$img_src[2],
            x = 0.32, y = 0, scale = 0.2)
 ```
 
