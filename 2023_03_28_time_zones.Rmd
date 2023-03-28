@@ -120,6 +120,6 @@ Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your p
 ```{r}
 
 # This will save your most recent plot
-ggsave("image/time_zones.png", p, width = 7, height = 6)
+ggsave("image/time_zones.png", p, width = 7, height = 5)
 
 ```
