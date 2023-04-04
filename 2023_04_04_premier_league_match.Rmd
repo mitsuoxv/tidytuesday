@@ -1,0 +1,152 @@
+---
+title: "Premier League Match Data"
+date: 2023-04-04
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(lubridate)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+library(tsibble)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2023-04-04")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+soccer <- tt$`soccer21-22` |> 
+  janitor::clean_names() |> 
+  mutate(date = dmy(date))
+
+range(soccer$date)
+
+soccer |> 
+  count(htr, sort = TRUE)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+soccer |> 
+  mutate(month = yearmonth(date)) |> 
+  group_by(month) |> 
+  summarize(
+    n = n(),
+    prop_ftr_h = sum(ftr == "H") / n,
+    prop_htr_h = sum(htr == "H") / n
+  ) |> 
+  pivot_longer(starts_with("prop_"),
+               names_to = "win_home", values_to = "prop") |> 
+  ggplot(aes(month, prop, color = win_home)) +
+  geom_line() +
+  geom_point()
+```
+
+```{r}
+p <- soccer |> 
+  mutate(month = yearmonth(date)) |> 
+  group_by(month) |> 
+  summarize(
+    n = n(),
+    ftr_h = sum(ftr == "H"),
+    ftr_a = sum(ftr == "A"),
+    ftr_d = sum(ftr == "D"),
+    htr_h = sum(htr == "H"),
+    htr_a = sum(htr == "A"),
+    htr_d = sum(htr == "D")
+  ) |> 
+  pivot_longer(
+    ftr_h:htr_d,
+    names_to = c("final_half", "result"),
+    names_sep = "_"
+  ) |> 
+  mutate(
+    result = case_match(result,
+      "a" ~ "Away",
+      "d" ~ "Draw",
+      "h" ~ "Home"
+    ) 
+  ) |> 
+  ggplot(aes(final_half, value)) +
+  geom_col(aes(fill = result), position = "fill",
+           width = 1, color = "white") +
+  geom_hline(yintercept = 0.5, lty = 2) +
+  geom_text(aes(label = n), x = 1.5, y = 0.05, color = "white") +
+  scale_y_continuous(labels = label_percent()) +
+  scale_fill_manual(values = c("red", "gray70", "blue")) +
+  facet_wrap(vars(month), nrow = 1, strip.position = "bottom") +
+  labs(fill = NULL,
+       title = "Losing team at halftime often manages to draw at full time",
+       subtitle = "Proportions of results; left is halftime results, and right is full time results\nnumbers denote # of matches in each month",
+     caption = "Source: Premier League Match Data 2021-2022 via Evan Gower on Kaggle") +
+  theme_void() +
+  theme(
+    axis.text.y = element_text(size = 8),
+    plot.background = element_rect(fill = "white", color = "white")
+  )
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/premier_league_match.png", p, width = 8, height = 5)
+
+```
