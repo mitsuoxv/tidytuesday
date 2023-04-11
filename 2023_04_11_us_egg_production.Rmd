@@ -96,9 +96,50 @@ Using your processed dataset, create your unique visualization.
 ```{r Visualize}
 range(egg_production$observed_month)
 
-egg_production |> 
+p <- egg_production |> 
+  filter(observed_month > yearmonth("2016 Jul"),
+         observed_month < yearmonth("2021 Feb")) |> 
+  mutate(
+    prod_type = factor(prod_type,
+                       levels = c("table eggs", "hatching eggs"),
+                       labels = c("Table eggs", "Hatching eggs"))
+    ) |> 
+  select(observed_month, prod_type, prod_process, n_hens) |> 
+  pivot_wider(names_from = prod_process, values_from = n_hens,
+              values_fill = 0) |> 
+  mutate(`non-cage-free` = all - `cage-free (non-organic)` - `cage-free (organic)`) |> 
+  select(!all) |> 
+  pivot_longer(`cage-free (non-organic)`:`non-cage-free`,
+               names_to = "prod_process", values_to = "n_hens") |> 
+  mutate(
+    prod_process = factor(prod_process,
+                          levels = c("cage-free (organic)", "cage-free (non-organic)", "non-cage-free"))
+  ) |> 
   ggplot(aes(observed_month, n_hens)) +
-  geom_col(aes(fill = prod_process))
+  geom_area(aes(fill = prod_process),
+            position = position_fill(reverse = TRUE)) +
+  scale_y_continuous(labels = label_percent(), expand = c(0, 0)) +
+  scale_x_yearmonth(expand = c(0, 0), labels = label_date_short()) +
+  scale_fill_manual(values = c("green", "blue", "gray80")) +
+  facet_wrap(vars(prod_type), nrow = 1) +
+  labs(x = NULL,
+       y = "Share of hens", fill = "Production process",
+       title = "While cage-free is increasing, organic barely increases.\nAnd cage-free hens bear no hatching eggs.",
+       caption = "Source: The Humane League's US Egg Production dataset by Samara Mendez") +
+  theme(
+    legend.position = "top",
+    strip.background = element_blank(),
+    strip.text = element_text(color = "black", size = 12)
+  )
+```
+
+```{r}
+egg_production |> 
+  count(observed_month, prod_type, prod_process) |> 
+  filter(n > 1)
+
+egg_production |> 
+  filter(prod_type == "hatching eggs", prod_process != "all")
 ```
 
 ```{r}
@@ -115,7 +156,7 @@ cage_free_percentages |>
 ```{r}
 range(cage_free_percentages$observed_month)
 
-p <- cage_free_percentages |> 
+cage_free_percentages |> 
   group_by(observed_month) |> 
   summarize(percent_hens = mean(percent_hens, na.rm = TRUE) / 100) |> 
   ggplot(aes(observed_month, percent_hens)) +
@@ -134,6 +175,13 @@ cage_free_percentages |>
   geom_line()
 ```
 
+```{r}
+cage_free_percentages |> 
+  filter(source == "computed") |> 
+  ggplot(aes(percent_hens, percent_eggs)) +
+  geom_point()
+```
+
 
 # Save Image
 
@@ -142,6 +190,6 @@ Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your p
 ```{r}
 
 # This will save your most recent plot
-ggsave("image/us_egg_production.png", p, width = 6, height = 4)
+ggsave("image/us_egg_production.png", p, width = 7, height = 5)
 
 ```
