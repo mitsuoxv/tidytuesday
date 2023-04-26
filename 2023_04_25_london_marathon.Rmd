@@ -1,0 +1,145 @@
+---
+title: "London marathon"
+date: 2023-04-26
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(lubridate)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+
+library(tidytext)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2023-04-25")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+winners <- tt$winners |> 
+  janitor::clean_names()
+
+london_marathon <- tt$london_marathon |> 
+  janitor::clean_names()
+```
+
+```{r}
+skimr::skim(winners)
+```
+
+```{r}
+winners |> 
+  count(category)
+
+winners |> 
+  count(nationality, sort = TRUE)
+
+winners |> 
+  count(category, nationality, sort = TRUE)
+```
+
+Tie is only once.
+```{r}
+winners |> 
+  count(category, year, sort = TRUE)
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+winners |> 
+  ggplot(aes(year, time)) +
+  geom_line() +
+  expand_limits(y = 0) +
+  facet_wrap(vars(category))
+```
+
+```{r}
+p <- winners |> 
+  count(category, nationality) |> 
+  mutate(
+    africa = if_else(nationality %in% c("Kenya", "Ethiopia", "Morocco"),
+                     "Africa", "Non-Africa"
+    ),
+    nationality = reorder_within(nationality,
+                                      by = n, within = category),
+    category = factor(category,
+                      levels = c("Men", "Women", "Wheelchair Men", "Wheelchair Women"))
+  ) |> 
+  ggplot(aes(n, nationality)) +
+  geom_col(aes(fill = africa)) +
+  scale_y_reordered() +
+  facet_wrap(vars(category), scales = "free_y") +
+  labs(x = "# of winners", y = NULL,
+       fill = "Winner nationality continent",
+       title = "While there are many winners from Africa in London Marathon,\nthere is no winner so far from Africa in Wheelchair category.",
+       caption = "Source: Nicola Rennie's LondonMarathon R package") +
+  theme(legend.position = "top",
+        strip.background = element_blank(),
+        strip.text = element_text(color = "black"))
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/london_marathon.png", p, width = 7, height = 6)
+
+```
