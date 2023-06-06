@@ -1,0 +1,120 @@
+---
+title: "Energy"
+date: 2023-06-06
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(lubridate)
+library(tidytuesdayR)
+
+library(scales)
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+owid_energy <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-06-06/owid-energy.csv')
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+glimpse(owid_energy)
+
+skimr::skim(owid_energy)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+tidy_energy <- function(type) {
+  owid_energy |> 
+    select(country, iso_code, year, ends_with(type)) |> 
+    pivot_longer(ends_with(type),
+                 names_to = "energy",
+                 names_pattern = paste0("(.*)", type))
+}
+
+cat1 <- c("coal", "oil", "gas", "hydro", "nuclear", "biofuel", "solar", "wind")
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+
+tidy_energy("_elec_per_capita") |> 
+  filter(year >= 1960, !country %in% c("Iceland", "Norway")) |> 
+  ggplot(aes(year, value)) +
+  geom_line(aes(color = country), show.legend = FALSE) +
+  facet_wrap(vars(energy))
+
+tidy_energy("_elec_per_capita") |> 
+  filter(year >= 1960, energy == "hydro") |> 
+  filter(value > 20000) |> 
+  distinct(country) # Iceland and Norway
+```
+
+```{r}
+tidy_energy("_share_energy") |> 
+  filter(year >= 1965, energy %in% cat1) |> 
+  mutate(energy = factor(energy, levels = cat1)) |> 
+  ggplot(aes(year, value)) +
+  geom_line(aes(color = country), show.legend = FALSE) +
+  facet_wrap(vars(energy)) +
+  labs(x = NULL, y = "Share of primary energy consumption\n(percent)")
+```
+
+```{r}
+p <- tidy_energy("_share_elec") |> 
+  filter(year >= 2000, energy %in% cat1) |> 
+  mutate(energy = factor(energy, levels = cat1)) |> 
+  ggplot(aes(year, value)) +
+  geom_line(aes(group = country), color = "gray80",
+            show.legend = FALSE) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(vars(energy)) +
+  labs(x = NULL, y = "Share of electricity generation\n(percent)",
+       title = "Electricity generation moves away from carbon very slowly\nin this century",
+       subtitle = "Blue line shows linear trend, and each gray line shows a country",
+       caption = "Source: Our World in Data's Energy Data Explorer") +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(color = "black"))
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/energy.png", p, width = 6, height = 6)
+
+```
