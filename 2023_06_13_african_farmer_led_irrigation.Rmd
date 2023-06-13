@@ -1,0 +1,210 @@
+---
+title: "Studying African Farmer-Led Irrigation Survey"
+date: 2023-06-13
+output: html_document
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(lubridate)
+library(tidytuesdayR)
+
+library(scales)
+library(bbplot)
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2023-06-13")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r Glimpse}
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r Wrangle}
+
+safi_data <- tt$safi_data |> 
+  mutate(
+    respondent_wall_type = str_trim(respondent_wall_type),
+    no_months_lack_food = 
+      if_else(months_lack_food == "none",
+              0, str_count(months_lack_food, ";") + 1)
+  )
+
+skimr::skim(safi_data)
+```
+
+key_ID 1 and 21 are not unique but double
+```{r}
+safi_data |> 
+  count(key_ID, sort = TRUE)
+```
+
+```{r}
+safi_data |> 
+  count(village, sort = TRUE)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r Visualize}
+avg_no_membrs <- safi_data |> 
+  group_by(village, memb_assoc) |> 
+  summarize(avg_no_membrs = mean(no_membrs), .groups = "drop")
+
+safi_data |> 
+  ggplot(aes(no_membrs)) +
+  geom_histogram(binwidth = 1) +
+  geom_vline(aes(xintercept =avg_no_membrs), lty = 2, 
+             data = avg_no_membrs) +
+  facet_grid(vars(memb_assoc), vars(village))
+
+safi_data |> 
+  ggplot(aes(years_liv)) +
+  geom_histogram(binwidth = 1)
+  
+safi_data |> 
+  count(respondent_wall_type, sort = TRUE)
+
+safi_data |> 
+  ggplot(aes(rooms)) +
+  geom_histogram(aes(fill = respondent_wall_type), binwidth = 1)
+
+safi_data |> 
+  count(village, memb_assoc, sort = TRUE) |> 
+  ggplot(aes(memb_assoc, n)) +
+  geom_col() +
+  facet_wrap(vars(village))
+
+safi_data |> 
+  count(affect_conflicts, sort = TRUE)
+```
+
+```{r}
+safi_data |> 
+  count(memb_assoc, affect_conflicts, sort = TRUE) |> 
+  filter(memb_assoc != "NULL") |> 
+  mutate(
+    affect_conflicts = 
+      factor(affect_conflicts,
+             levels = c("frequently", "more_once", "once", "never"))
+  ) |> 
+  ggplot(aes(memb_assoc, n)) +
+  geom_col(aes(fill = affect_conflicts), position = "fill")
+```
+
+```{r}
+safi_data |> 
+  ggplot(aes(liv_count)) +
+  geom_histogram(aes(fill = memb_assoc), binwidth = 1)
+```
+
+```{r}
+safi_data |> 
+  count(items_owned, sort = TRUE)
+
+village_count <- safi_data |> 
+  count(village, memb_assoc, name = "nn")
+
+items_owned <- safi_data |> 
+  separate_longer_delim(items_owned, ";")
+  
+items_likely_owned <- items_owned |> 
+  count(items_owned, sort = TRUE) |> 
+  head(5) |> 
+  pull(items_owned)
+
+p <- items_owned |> 
+  filter(items_owned %in% items_likely_owned) |> 
+  count(village, memb_assoc, items_owned, sort = TRUE) |> 
+  left_join(village_count, by = c("village", "memb_assoc")) |> 
+  mutate(
+    prop = n / nn,
+    items_owned = items_owned |>
+      str_replace("_", " ") |> 
+      fct_reorder(prop)
+    ) |> 
+  ggplot(aes(prop, items_owned)) +
+  geom_col(aes(fill = items_owned), show.legend = FALSE) +
+  geom_vline(xintercept = 0.5, lty = 2) +
+  scale_x_continuous(labels = label_percent(), breaks = c(0, 0.5)) +
+  facet_grid(vars(memb_assoc), vars(village)) +
+  bbc_style() +
+  labs(title = "Richer households tend to join irrigation",
+       subtitle = "Items ownership rate by village and irrigation participation")
+```
+
+```{r}
+safi_data |> 
+  ggplot(aes(no_meals)) +
+  geom_histogram(aes(fill = memb_assoc), binwidth = 1)
+```
+
+```{r}
+safi_data |> 
+  ggplot(aes(no_months_lack_food)) +
+  geom_histogram(aes(fill = memb_assoc), binwidth = 1) +
+  facet_wrap(vars(village))
+
+safi_data |>
+  ggplot(aes(village, no_months_lack_food)) +
+  geom_boxplot(aes(color = memb_assoc))
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+finalise_plot(p,
+              source = "Source: Studying African Farmer-Led Irrigation survey", 
+              save_filepath = "image/african_farmer_led_irrigation.png",
+              width_pixels = 640,
+              height_pixels = 450)
+
+```
