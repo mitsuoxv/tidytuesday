@@ -104,7 +104,7 @@ p <- zonann_temps |>
   scale_color_brewer(palette = "Dark2") +
   labs(x = NULL, y = "Temperature deviations\nfrom 1951-1980 means",
        color = "Lattitude",
-       title = "Higher latittudes are more sensitive to the climate change\nin both hemispheres",
+       title = "Higher latitudes are more sensitive to the climate change\nin both hemispheres",
        caption = "Source: NASA GISS Surface Temperature Analysis (GISTEMP v4)") +
   theme(legend.position = "top",
         strip.background = element_rect(fill = "white", color = "gray50"),
