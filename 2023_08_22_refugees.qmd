@@ -1,0 +1,128 @@
+---
+title: "Refugees"
+date: 2023-08-28
+format: html
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2023-08-22")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+population <- tt$population
+```
+
+```{r}
+range(population$year)
+```
+
+```{r}
+population |> 
+  count(year, coo_name, coo, sort = TRUE)
+
+population |> 
+  filter(year == 2022, coo == "SYR")
+
+five_origins <- population |> 
+  filter(year == 2022, coa == "JPN") |>
+  count(coo, coo_name, wt = refugees, sort = TRUE) |> 
+  slice_max(order_by = n, n = 5) |> 
+  pull(coo_name)
+
+four_origins <- five_origins[-4]
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+p <- population |> 
+  filter(coa == "JPN") |> 
+  mutate(
+    coo_name = coo_name |> 
+      factor(levels = four_origins) |> 
+      coalesce("Other") |> 
+      factor(levels = c(four_origins, "Other"))
+    ) |> 
+  ggplot(aes(year, refugees)) +
+  geom_col(aes(fill = coo_name)) +
+  scale_y_continuous(labels = scales::comma_format()) +
+  scale_fill_brewer(palette = "Accent") +
+  labs(x = NULL, y = "# of regugees", fill = "Origins",
+       title = "Refugees in Japan mostly come from Myanmar",
+       caption = "Source: PopulationStatistics {refugees} R package")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/refugees.png", p, width = 7, height = 5)
+
+```
