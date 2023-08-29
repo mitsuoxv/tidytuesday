@@ -97,7 +97,7 @@ p <- fair_use_cases |>
   scale_x_continuous(labels = scales::percent_format()) +
   labs(x = "Proportion of fair use found", y = NULL,
        title = "Review/Commentary is most likely to be found as fair use\namong categories with more than 10 cases",
-       subtitle = "Lines are within one standard deviation of proportion",
+       subtitle = "Lines denote the range of +- one standard deviation of proportion",
        caption = "Source: U.S. Copyright Office Fair Use Index")
 ```
 
