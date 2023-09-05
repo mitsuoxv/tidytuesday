@@ -1,0 +1,228 @@
+---
+title: "Union Membership in the United States"
+date: 2023-09-05
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+demographics <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-09-05/demographics.csv')
+wages <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-09-05/wages.csv')
+states <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-09-05/states.csv')
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+list(demographics, wages, states) %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+year: 49 years from 1973 to 2022 except 1982
+
+```{r}
+#| label: Wrangle
+
+range(demographics$year)
+
+demographics |> 
+  filter(year == 1982)
+
+demographics |> 
+  count(facet, sort = TRUE) |> View()
+```
+
+```{r}
+wages |> 
+  count(facet, sort = TRUE) |> View()
+
+wages2 <- bind_rows(
+  wages |> 
+  filter(facet == "all wage and salary workers") |> 
+  group_by(year) |> 
+  slice_head(n = 1) |> 
+  ungroup(),
+  wages |> 
+  filter(facet != "all wage and salary workers")
+)
+
+wages2 |> 
+  count(facet, sort = TRUE) |> View()
+
+```
+
+year: 40, from 1982 to 2022
+sector: 5
+state: 51: 50 states + District of Columbia
+```{r}
+states |> 
+  count(state, sector, year, sort = TRUE) |> View()
+
+states |> 
+  filter(
+    state == "Alabama",
+    year == 1983
+  ) |> View()
+
+range(states$year)
+
+states |> 
+  distinct(state) |> View()
+
+sectors <- states |> 
+  distinct(sector) |> 
+  pull(sector)
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+demographics |> 
+  filter(str_detect(facet, "demographics: ")) |> 
+  mutate(facet = str_remove(facet, "demographics: ")) |> 
+  ggplot(aes(year, p_members)) +
+  geom_line() +
+  facet_wrap(vars(facet))
+
+demographics |> 
+  filter(str_detect(facet, "public sector: ")) |> 
+  mutate(facet = str_remove(facet, "public sector: ")) |> 
+  ggplot(aes(year, p_members)) +
+  geom_line() +
+  facet_wrap(vars(facet))
+
+demographics |> 
+  filter(str_detect(facet, "private sector: ")) |> 
+  mutate(facet = str_remove(facet, "private sector: ")) |> 
+  ggplot(aes(year, p_members)) +
+  geom_line() +
+  facet_wrap(vars(facet))
+
+demographics |> 
+  filter(
+    !str_detect(facet, "demographics: "),
+    !str_detect(facet, "public sector: "),
+    !str_detect(facet, "private sector: ")
+    ) |> 
+  ggplot(aes(year, p_members)) +
+  geom_line() +
+  facet_wrap(vars(facet))
+
+```
+
+```{r}
+wages2 |> 
+  filter(str_detect(facet, "demographics: ")) |> 
+  mutate(facet = str_remove(facet, "demographics: ")) |> 
+  ggplot(aes(year, union_wage_premium_adjusted)) +
+  geom_line() +
+  facet_wrap(vars(facet))
+
+wages2 |> 
+  filter(str_detect(facet, "public sector: ")) |> 
+  mutate(facet = str_remove(facet, "public sector: ")) |> 
+  ggplot(aes(year, union_wage_premium_adjusted)) +
+  geom_line() +
+  facet_wrap(vars(facet))
+
+wages2 |> 
+  filter(str_detect(facet, "private sector: ")) |> 
+  mutate(facet = str_remove(facet, "private sector: ")) |> 
+  ggplot(aes(year, union_wage_premium_adjusted)) +
+  geom_line() +
+  facet_wrap(vars(facet))
+
+wages2 |> 
+  filter(
+    !str_detect(facet, "demographics: "),
+    !str_detect(facet, "public sector: "),
+    !str_detect(facet, "private sector: ")
+    ) |> 
+  ggplot(aes(year, union_wage_premium_adjusted)) +
+  geom_line() +
+  facet_wrap(vars(facet))
+
+```
+
+```{r}
+states |> 
+  ggplot(aes(year, p_members)) +
+  geom_line(aes(color = state), show.legend = FALSE) +
+  facet_wrap(vars(sector))
+
+states |> 
+  ggplot(aes(year, p_covered)) +
+  geom_line(aes(color = state), show.legend = FALSE) +
+  facet_wrap(vars(sector))
+
+states2 <- states |> 
+  filter(sector == "Public") |> 
+  summarize(p_members = mean(p_members),
+            .by = state) |> 
+  mutate(state = str_to_lower(state))
+
+p <- map_data("state") |> 
+  left_join(states2, join_by(region == state)) |> 
+  ggplot(aes(long, lat, group = group)) +
+  geom_polygon(aes(fill = p_members), color = "white") +
+  coord_map("polyconic") +
+  scale_fill_gradient2(low = "#559999", mid = "grey90", high = "#BB650B",
+                      midpoint = median(states2$p_members),
+                      labels = scales::percent_format()) +
+  labs(fill = "Percent of\nunion workers\nin public sector",
+       title = "Percent of union workers in public sector is high\nin North east, Mid-west and West Coast",
+       caption = "Note: 40 year average from 1982 to 2022\nSource: the Union Membership, Coverage, and Earnings from the CPS by\nBarry Hirsch (Georgia State University), David Macpherson (Trinity University), and\nWilliam Even (Miami University)") +
+  theme_void() +
+  theme(plot.background = element_rect(fill = "white",
+                                       color = "white"))
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/union_membership.png", p, width = 7, height = 5)
+
+```
