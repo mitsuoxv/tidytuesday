@@ -1,0 +1,143 @@
+---
+title: "US Government Grant Opportunities"
+date: 2023-10-05
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2023-10-03")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt %>% 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+grants <- tt$grants
+grant_opportunity_details <- tt$grant_opportunity_details
+```
+
+Only 2000 out of 74669 grants have details.
+
+```{r}
+range(grants$opportunity_id)
+range(grant_opportunity_details$opportunity_id)
+
+nrow(grants)
+nrow(grant_opportunity_details)
+
+grants |> 
+  semi_join(grant_opportunity_details, by = "opportunity_id") |> 
+  nrow()
+```
+
+```{r}
+grants |> 
+  count(agency_code, agency_name, sort = TRUE)
+
+range(grants$posted_date)
+range(grants$close_date, na.rm = TRUE)
+range(grants$last_updated_date_time)
+
+grants |> 
+  count(opportunity_status)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+top_agency_codes <- grants |> 
+  filter(!is.na(estimated_funding)) |> 
+  count(agency_code, agency_name, sort = TRUE) |> 
+  head(5) |> 
+  pull(agency_code)
+
+p <- grants |> 
+  filter(agency_code %in% top_agency_codes) |> 
+  mutate(mean_funding = mean(estimated_funding, na.rm = TRUE), .by = agency_code) |> 
+  mutate(
+    agency_name = str_wrap(agency_name, width = 15),
+    agency_name = fct_reorder(agency_name, -mean_funding)
+    ) |> 
+  ggplot(aes(estimated_funding)) +
+  geom_histogram(aes(fill = agency_name), show.legend = FALSE) +
+  geom_vline(aes(xintercept = mean_funding), lty = 2) +
+  scale_x_log10(labels = scales::comma_format()) +
+  facet_wrap(vars(agency_name), ncol = 1, strip.position = "left") +
+  labs(x = "Estimated funding (dollars, log-scale)",
+       y = "# of grants",
+       title = "NIH grants have the highest funding\namong top 5 count grant agencies",
+       subtitle = "Dashed lines denote average funding",
+       caption = "Source: Grants.gov") +
+  theme(panel.grid.minor.y = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_text(color = "black"),
+        strip.placement = "outside")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/us_gov_grant.png", p, width = 5, height = 7)
+
+```
