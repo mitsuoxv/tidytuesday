@@ -1,0 +1,182 @@
+---
+title: "US Polling Places 2012-2020"
+date: 2024-01-18
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2024-01-16")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+polling_places <- tt$polling_places |> 
+  mutate(address = str_replace_all(address, " +", " "))
+```
+
+```{r}
+range(polling_places$election_date)
+
+polling_places |> 
+  count(state, sort = TRUE)
+
+polling_places |> 
+  count(jurisdiction_type, sort = TRUE)
+
+polling_places |> 
+  count(location_type, sort = TRUE)
+
+polling_places |> 
+  count(source, sort = TRUE)
+```
+
+```{r}
+polling_places |> 
+  filter(state == "NJ") |> 
+  count(election_date, sort = TRUE)
+
+polling_places |> 
+  filter(state == "NJ") |> 
+  count(name, address, sort = TRUE)
+
+polling_places |> 
+  filter(state == "NJ") |> 
+  count(election_date, name, address, sort = TRUE)
+
+polling_places |> 
+  filter(state == "NJ", election_date == "2012-11-06",
+         name == "HILLSBOROUGH HIGH SCHOOL") |> View()
+
+```
+
+```{r}
+distinct_polling_places <- polling_places |> 
+  distinct(election_date, state, name, address)
+
+distinct_polling_places |> 
+  count(state, name, address, sort = TRUE)
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+distinct_polling_places |> 
+  count(election_date, sort = TRUE)
+
+prop_school_by_state <- distinct_polling_places |> 
+  filter(!election_date %in% c("2016-02-09", "2016-09-13")) |> 
+  mutate(school = name |> 
+           str_to_lower() |> 
+           str_detect("school")) |> 
+  group_by(election_date, state) |> 
+  summarize(
+    n = n(),
+    n_school = sum(school, na.rm = TRUE),
+    prop_school = n_school / n,
+    .groups = "drop"
+  )
+
+included_states <- prop_school_by_state |> 
+  distinct(state) |> 
+  pull(state)
+
+library(ggrepel)
+
+p <- prop_school_by_state |> 
+  ggplot(aes(prop_school, election_date)) +
+  geom_boxplot(aes(group = election_date)) +
+  geom_text_repel(aes(label = state),
+            data = prop_school_by_state |>
+              filter(state %in% c("CT", "MD"))) +
+  scale_y_date(breaks = prop_school_by_state |>
+                 distinct(election_date) |> 
+                 pull(election_date)) +
+  scale_x_continuous(labels = scales::percent_format()) +
+  labs(x = "Share of school in polling places",
+       y = "Election day",
+       title = "Connecticut and Maryland are outliers\nin share of school in polling places",
+   subtitle = paste0("Among 39 states, excluding ", setdiff(state.abb, included_states) |> str_flatten(", ", ", and ")),
+ caption = "Source: Center for Public Integrity")
+
+prop_school_by_state |> 
+  filter(prop_school > 0.6)
+
+state.name[state.abb == "CT"]
+state.name[state.abb == "MD"]
+
+prop_school_by_state |>
+  filter(state %in% c("CT", "MD"))
+
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/us_polling_places_2012_2020.png", p, width = 7, height = 5)
+
+```
