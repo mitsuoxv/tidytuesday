@@ -1,0 +1,168 @@
+---
+title: "Groundhog predictions"
+date: 2024-01-30
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2024-01-30")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+groundhogs <- tt$groundhogs
+predictions <- tt$predictions
+```
+
+```{r}
+predictions |> 
+  filter(!is.na(shadow)) |> 
+  summarize(
+    n = n(),
+    n_shadow = sum(shadow),
+    prop_shadow = n_shadow / n,
+    .by = id
+  )
+
+groundhogs |> 
+  select(id, predictions_count)
+
+groundhogs |> 
+  count(country)
+
+groundhogs |> 
+  count(region, sort = TRUE)
+
+range(groundhogs$latitude)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+predictions |> 
+  filter(!is.na(shadow)) |> 
+  summarize(
+    n = n(),
+    n_shadow = sum(shadow),
+    prop_shadow = n_shadow / n,
+    .by = year
+  ) |> 
+  ggplot(aes(year, prop_shadow)) +
+  geom_line() +
+  geom_point(aes(size = n), alpha = 1/4)
+```
+
+```{r}
+prop_shadow_by_id <- predictions |> 
+  filter(!is.na(shadow)) |> 
+  summarize(
+    n = n(),
+    n_shadow = sum(shadow),
+    prop_shadow = n_shadow / n,
+    .by = id
+  )
+
+prop_shadow_by_id2 <- prop_shadow_by_id |> 
+  filter(n > 5) |> 
+  left_join(groundhogs, by = "id") |> 
+  mutate(high_latitude = if_else(latitude > 41,
+                                 "Latitude > 41",
+                                 "Latitude < 41")) |> 
+  mutate(
+    avg_prop_shadow = mean(prop_shadow),
+    .by = high_latitude
+  )
+
+prop_shadow_by_id2 |> 
+  filter(latitude == 41)
+
+high_latitude_count <- prop_shadow_by_id2 |> 
+  count(high_latitude, name = "groundhog_count")
+
+p <- prop_shadow_by_id2 |> 
+  left_join(high_latitude_count, by = "high_latitude") |> 
+  mutate(high_latitude = glue::glue("{high_latitude} ({groundhog_count})")) |>
+  ggplot(aes(prop_shadow)) +
+  geom_histogram(aes(fill = high_latitude), binwidth = 0.05,
+                 show.legend = FALSE) +
+  geom_vline(aes(xintercept = avg_prop_shadow), lty = 2) +
+  scale_x_continuous(labels = scales::percent_format()) +
+  expand_limits(x = 0) +
+  facet_wrap(vars(high_latitude), ncol = 1) +
+  labs(x = "Proportion of shadow-seeing", y = "Groundhog count",
+       title = "Groundhogs living in less than 41 degree latitude may be\nmore likely to see shadows",
+       subtitle = "60 groundhogs with more than 5 prediction counts.\n# in parenthes denotes number of groundhogs.\nDased line denotes mean.",
+   caption = "Source: Groundhog-day.com API") +
+  theme(strip.background = element_rect(fill = "white", color = "gray50"),
+        strip.text = element_text(color = "black"))
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/groundhog_predictions.png", p, width = 6, height = 6)
+
+```
