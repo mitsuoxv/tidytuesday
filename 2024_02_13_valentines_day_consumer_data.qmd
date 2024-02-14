@@ -90,7 +90,7 @@ p <- gifts_gender |>
   scale_fill_manual(values = c("steelblue", "red")) +
   labs(x = "Men - Women in average percent spending",
        y = "Gifts",
-     title = "Flowers are presents from men to women, and\ncandy is a present from women to men in Valentine's Day",
+     title = "Flowers are presents from men to women, and\ncandy is a present from women to men on Valentine's Day",
      caption = "Source: National Retail Federation")
 ```
 
