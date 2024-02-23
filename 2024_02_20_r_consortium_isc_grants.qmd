@@ -158,7 +158,7 @@ p2 <- summary_unnested |>
   scale_x_continuous(labels = scales::dollar_format()) +
   labs(x = "Grants for the project",
        y = "Word in the summary",
-       title = "I've faild to find a non-stopword,\nwhich make grants larger, if included in a summary",
+       title = "I've faild to find a non-stopword,\nwhich makes grants larger, if included in a summary",
        subtitle = "# in parenthes denotes # of projects whose summary includes the word.\nWord with more than 20",
      caption = "Source: R Consortium ISC Funded Projects")
 ```
