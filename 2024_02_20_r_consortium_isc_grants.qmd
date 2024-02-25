@@ -163,6 +163,28 @@ p2 <- summary_unnested |>
      caption = "Source: R Consortium ISC Funded Projects")
 ```
 
+```{r}
+p3 <- summary_unnested |> 
+  anti_join(get_stopwords(), by = "word") |> 
+  distinct(row, word, funded) |> 
+  mutate(n = n(), .by = word) |> 
+  filter(n > 10) |> 
+  mutate(
+    word = glue::glue("{word} ({n})"),
+    word = fct_reorder(word, funded)
+    ) |> 
+  ggplot(aes(funded, word)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_point(position = position_jitter(width = 0, height = 0.2),
+             alpha = 0.2) +
+  scale_x_continuous(labels = scales::dollar_format()) +
+  labs(x = "Grants for the project",
+       y = "Word in the summary",
+       title = "If the summary includes 'tools' or 'provide', grants tend to be larger",
+       subtitle = "# in parenthes denotes # of projects whose summary includes the word.\nWord with more than 10",
+     caption = "Source: R Consortium ISC Funded Projects")
+```
+
 # Save Image
 
 Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
@@ -173,5 +195,7 @@ Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your p
 ggsave("image/r_consortium_isc_grants.png", p, width = 6, height = 4)
 
 ggsave("image/r_consortium_isc_grants2.png", p2, width = 7, height = 4)
+
+ggsave("image/r_consortium_isc_grants3.png", p3, width = 8, height = 8)
 
 ```
