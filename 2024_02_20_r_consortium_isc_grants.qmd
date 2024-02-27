@@ -121,41 +121,35 @@ isc_grants_w_row |>
 
 ```{r}
 
-p <- title_unnested |> 
-  distinct(row, word, funded) |> 
-  mutate(n = n(), .by = word) |> 
-  filter(n > 10) |> 
-  mutate(
-    word = glue::glue("{word} ({n})"),
-    word = fct_reorder(word, funded)
+draw_boxplot <- function(df, min_proj) {
+  df |> 
+    distinct(row, word, funded) |> 
+    mutate(n = n(), .by = word) |> 
+    filter(n > min_proj) |> 
+    mutate(
+      word = glue::glue("{word} ({n})"),
+      word = fct_reorder(word, funded)
     ) |> 
-  ggplot(aes(funded, word)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_point(position = position_jitter(width = 0, height = 0.2),
-             alpha = 0.2) +
-  scale_x_continuous(labels = scales::dollar_format()) +
+    ggplot(aes(funded, word)) +
+    geom_boxplot(outlier.shape = NA) +
+    geom_point(position = position_jitter(width = 0, height = 0.2),
+               alpha = 0.2) +
+    scale_x_continuous(labels = scales::dollar_format())
+}
+
+p <- title_unnested |> 
+  draw_boxplot(min_proj = 10) + 
   labs(x = "Grants for the project",
        y = "Word in the title",
        title = "If the title includes 'the', grants tend to be larger",
        subtitle = "# in parenthes denotes # of projects whose title include the word.\nWord with more than 10",
-     caption = "Source: R Consortium ISC Funded Projects")
+       caption = "Source: R Consortium ISC Funded Projects")
 ```
 
 ```{r}
 p2 <- summary_unnested |> 
   anti_join(get_stopwords(), by = "word") |> 
-  distinct(row, word, funded) |> 
-  mutate(n = n(), .by = word) |> 
-  filter(n > 20) |> 
-  mutate(
-    word = glue::glue("{word} ({n})"),
-    word = fct_reorder(word, funded)
-    ) |> 
-  ggplot(aes(funded, word)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_point(position = position_jitter(width = 0, height = 0.2),
-             alpha = 0.2) +
-  scale_x_continuous(labels = scales::dollar_format()) +
+  draw_boxplot(min_proj = 20) +
   labs(x = "Grants for the project",
        y = "Word in the summary",
        title = "I've faild to find a non-stopword,\nwhich makes grants larger, if included in a summary",
@@ -166,23 +160,12 @@ p2 <- summary_unnested |>
 ```{r}
 p3 <- summary_unnested |> 
   anti_join(get_stopwords(), by = "word") |> 
-  distinct(row, word, funded) |> 
-  mutate(n = n(), .by = word) |> 
-  filter(n > 10) |> 
-  mutate(
-    word = glue::glue("{word} ({n})"),
-    word = fct_reorder(word, funded)
-    ) |> 
-  ggplot(aes(funded, word)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_point(position = position_jitter(width = 0, height = 0.2),
-             alpha = 0.2) +
-  scale_x_continuous(labels = scales::dollar_format()) +
+  draw_boxplot(min_proj = 10) +
   labs(x = "Grants for the project",
        y = "Word in the summary",
        title = "If the summary includes 'tools' or 'provide', grants tend to be larger",
        subtitle = "# in parenthes denotes # of projects whose summary includes the word.\nWord with more than 10",
-     caption = "Source: R Consortium ISC Funded Projects")
+       caption = "Source: R Consortium ISC Funded Projects")
 ```
 
 # Save Image
