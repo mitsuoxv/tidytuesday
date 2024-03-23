@@ -1,0 +1,113 @@
+---
+title: "X-Men Mutant Moneyball"
+date: 2024-03-23
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2024-03-19")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+mutant_moneyball <- tt$mutant_moneyball
+
+mutant_moneyball_long <- mutant_moneyball |> 
+  mutate(across(`60s_Appearance_Percent`:PPI90s_oStreet, parse_number)) |>      pivot_longer(
+    -Member,
+    names_to = c("category", "source"),
+    names_sep = "_"
+  )
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+p <- mutant_moneyball_long |> 
+  filter(str_detect(category, "^PPI")) |>
+  mutate(
+    value = if_else(value == 0, NA, value),
+    category = str_remove(category, "^PPI"),
+    source = factor(source, levels = c("heritage", "ebay", "oStreet", "wiz"),
+                    labels = c("Heritage", "eBay",
+                               "2015's Overstreet Price Guide",
+                               "April 1993's Wizard Price Guide"))
+    ) |>
+  ggplot(aes(category, value)) +
+  geom_line(aes(group = Member), alpha = 1/4) +
+  scale_y_log10(labels = scales::dollar_format()) +
+  facet_wrap(vars(source), scales = "free_y") +
+  labs(x = NULL, y = "Average price per issue\nfor each X-Men member",
+       title = "Older issues tend to be valued higher",
+       caption = "Source: Rally's Mutant moneyball: a data driven ultimate X-men by Anderson Evans")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/x_men_mutant_moneyball.png", p, width = 6, height = 4)
+
+```
