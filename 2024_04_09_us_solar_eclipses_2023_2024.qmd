@@ -1,0 +1,209 @@
+---
+title: "US Solar Eclipses, 2023 & 2024"
+date: 2024-04-10
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2024-04-09")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+eclipse_annular_2023 <- tt$eclipse_annular_2023
+eclipse_total_2024 <- tt$eclipse_total_2024
+eclipse_partial_2023 <- tt$eclipse_partial_2023
+eclipse_partial_2024 <- tt$eclipse_partial_2024
+```
+
+```{r}
+eclipses <- bind_rows(
+  eclipse_annular_2023 |> mutate(eclipse = "annular_2023"),
+  eclipse_total_2024 |> mutate(eclipse = "total_2024"),
+  eclipse_partial_2023 |> mutate(eclipse = "partial_2023") |> 
+    rename(eclipse_6 = eclipse_5, eclipse_5 = eclipse_4),
+  eclipse_partial_2024 |> mutate(eclipse = "partial_2024") |> 
+    rename(eclipse_6 = eclipse_5, eclipse_5 = eclipse_4)
+) |> 
+  mutate(
+    year = if_else(str_detect(eclipse, "2023"), 2023, 2024),
+    partial = if_else(str_detect(eclipse, "partial"), "partial", "full"),
+    duration = (eclipse_6 - eclipse_1) / 60
+  )
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+library(patchwork)
+
+eclipses |> 
+  ggplot(aes(duration)) +
+  geom_histogram() +
+  facet_wrap(vars(eclipse), ncol = 1, scales = "free_y")
+
+eclipses |> 
+  ggplot(aes(lat)) +
+  geom_histogram() +
+  facet_wrap(vars(eclipse), ncol = 1, scales = "free_y")
+
+eclipses |> 
+  ggplot(aes(lon)) +
+  geom_histogram() +
+  facet_wrap(vars(eclipse), ncol = 1, scales = "free_y")
+
+eclipses |> 
+  ggplot(aes(eclipse_1)) +
+  geom_histogram() +
+  facet_wrap(vars(eclipse), ncol = 1, scales = "free_y")
+```
+
+Only main land US.
+
+```{r}
+eclipses_ml <- eclipses |> 
+  filter(between(lon, -130, 0), lat > 20)
+```
+
+```{r}
+p1 <- eclipses_ml |> 
+  filter(year == 2023) |> 
+  ggplot(aes(duration, lat)) +
+  geom_point(alpha = 1/100, size = 1) +
+  geom_point(data = eclipses_ml |> filter(year == 2023, partial == "full"),
+             color = "red", size = 1) +
+  xlim(90, 200) +
+  labs(y = "latitude")
+
+p2 <- eclipses_ml |> 
+  filter(year == 2023) |> 
+  ggplot(aes(lon, duration)) +
+  geom_point(alpha = 1/100, size = 1) +
+  geom_point(data = eclipses_ml |> filter(year == 2023, partial == "full"),
+             color = "red", size = 1) +
+  ylim(90, 200) +
+  labs(x = "longitude")
+
+p3 <- eclipses_ml |> 
+  filter(year == 2023) |> 
+  ggplot(aes(lon, lat)) +
+  geom_point(alpha = 1/100, size = 1) +
+  geom_point(data = eclipses_ml |> filter(year == 2023, partial == "full"),
+             color = "red", size = 1) +
+  labs(x = NULL, y = "")
+
+p4 <- eclipses_ml |> 
+  filter(year == 2024) |> 
+  ggplot(aes(duration, lat)) +
+  geom_point(alpha = 1/100, size = 1) +
+  geom_point(data = eclipses_ml |> filter(year == 2024, partial == "full"),
+             color = "red", size = 1) +
+  xlim(90, 200) +
+  labs(y = "latitude")
+
+p5 <- eclipses_ml |> 
+  filter(year == 2024) |> 
+  ggplot(aes(lon, duration)) +
+  geom_point(alpha = 1/100, size = 1) +
+  geom_point(data = eclipses_ml |> filter(year == 2024, partial == "full"),
+             color = "red", size = 1) +
+  ylim(90, 200) +
+  labs(x = "longitude")
+
+p6 <- eclipses_ml |> 
+  filter(year == 2024) |> 
+  ggplot(aes(lon, lat)) +
+  geom_point(alpha = 1/100, size = 1) +
+  geom_point(data = eclipses_ml |> filter(year == 2024, partial == "full"),
+             color = "red", size = 1) +
+  labs(x = NULL, y = "")
+
+layout <- "
+AABBBB
+AABBBB
+CCDDDD
+EEFFFF
+EEFFFF
+GGHHHH
+"
+
+p <- p1 + p3 + wrap_elements(grid::textGrob('2023 Eclipse')) + p2 +
+  p4 + p6 + wrap_elements(grid::textGrob('2024 Eclipse')) + p5 +
+  plot_layout(design = layout) +
+  plot_annotation(
+    title = "Some partial eclipses have longer duration than annular or total ones",
+    subtitle = "duration is from first to last contact in minutes.\nred points denote annular or total eclipses while black points denote partial eclipses.",
+    caption = "Source: NASA's Scientific Visualization Studio"
+  )
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/us_solar_eclipses_2023_2024.png", p, width = 7, height = 10)
+
+```
