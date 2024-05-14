@@ -1,0 +1,226 @@
+---
+title: "The Great American Coffee Taste Test"
+date: 2024-05-14
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+coffee_survey <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-05-14/coffee_survey.csv')
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+glimpse(coffee_survey)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+skimr::skim(coffee_survey)
+
+coffee_survey |> 
+  count(age, sort = TRUE)
+
+coffee_survey |> 
+  count(cups, sort = TRUE)
+
+coffee_survey |> 
+  count(where_drink, sort = TRUE)
+
+coffee_survey |> 
+  count(brew, sort = TRUE)
+
+coffee_survey |> 
+  count(favorite, sort = TRUE)
+
+coffee_survey |> 
+  count(additions, sort = TRUE)
+
+coffee_survey |> 
+  count(style, sort = TRUE)
+
+coffee_survey |> 
+  count(strength, sort = TRUE)
+
+coffee_survey |> 
+  count(roast_level, sort = TRUE)
+
+coffee_survey |> 
+  count(caffeine, sort = TRUE)
+
+coffee_survey |> 
+  count(prefer_abc, sort = TRUE)
+
+coffee_survey |> 
+  count(prefer_ad, sort = TRUE)
+
+coffee_survey |> 
+  count(prefer_overall, sort = TRUE)
+
+coffee_survey |> 
+  count(wfh, sort = TRUE)
+
+coffee_survey |> 
+  count(why_drink, sort = TRUE)
+
+coffee_survey |> 
+  count(taste, sort = TRUE)
+
+coffee_survey |> 
+  count(know_source, sort = TRUE)
+
+coffee_survey |> 
+  count(most_paid, sort = TRUE)
+
+coffee_survey |> 
+  count(most_willing, sort = TRUE)
+
+coffee_survey |> 
+  count(value_cafe, sort = TRUE)
+
+coffee_survey |> 
+  count(spent_equipment, sort = TRUE)
+
+coffee_survey |> 
+  count(value_equipment, sort = TRUE)
+
+coffee_survey |> 
+  count(gender, sort = TRUE)
+
+coffee_survey |> 
+  count(education_level, sort = TRUE)
+
+coffee_survey |> 
+  count(ethnicity_race, sort = TRUE)
+
+coffee_survey |> 
+  count(employment_status, sort = TRUE)
+
+coffee_survey |> 
+  count(number_children, sort = TRUE)
+
+coffee_survey |> 
+  count(political_affiliation, sort = TRUE)
+
+coffee_survey |> 
+  count(political_affiliation, education_level, sort = TRUE) |> 
+  filter(political_affiliation == "Republican") |> 
+  mutate(prop = n / sum(n))
+
+coffee_survey |> 
+  count(political_affiliation, education_level, sort = TRUE) |> 
+  filter(political_affiliation == "Democrat") |> 
+  mutate(prop = n / sum(n))
+
+coffee_survey |> 
+  count(political_affiliation, prefer_abc, sort = TRUE) |> 
+  filter(political_affiliation == "Republican") |> 
+  mutate(prop = n / sum(n))
+
+coffee_survey |> 
+  count(political_affiliation, prefer_abc, sort = TRUE) |> 
+  filter(political_affiliation == "Democrat") |> 
+  mutate(prop = n / sum(n))
+
+```
+
+```{r}
+
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+coffee_survey |> 
+  select(!ends_with("_notes")) |> 
+  pivot_longer(
+    cols = starts_with("coffee_"),
+    names_to = c("coffee", "feature"),
+    names_pattern = "coffee_(.)_(.+)"
+  ) |> 
+  ggplot(aes(value)) +
+  geom_bar() +
+  facet_grid(rows = vars(feature), cols = vars(coffee))
+
+p <- coffee_survey |> 
+  count(political_affiliation, prefer_abc, sort = TRUE) |> 
+  na.omit() |> 
+  mutate(
+    n_poli = sum(n), .by = political_affiliation,
+    political_affiliation2 = glue::glue("{political_affiliation}\n({n_poli})")
+  ) |> 
+  ggplot(aes(political_affiliation2, n)) +
+  geom_col(aes(fill = prefer_abc), position = "fill") +
+  scale_y_continuous(labels = scales::percent_format(),
+                     expand = expansion(0, 0)) +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(x = NULL, y = "Proportion", fill = "Preferred coffee\namong A, B and C",
+       title = "Among Coffee A, B and C, Democrats prefer A,\nwhile Republicans prefer C which is less acid and more bitter",
+       subtitle = "# in parentheses denotes # of respondents",
+       caption = "Source: James Hoffmann and Cometeer, Great American Coffee Taste Test Survey")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/great_american_coffee_taste_test.png", p, width = 7, height = 4)
+
+```
