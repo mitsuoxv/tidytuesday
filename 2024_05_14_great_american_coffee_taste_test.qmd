@@ -173,11 +173,6 @@ coffee_survey |>
 
 ```
 
-```{r}
-
-
-```
-
 # Visualize
 
 Using your processed dataset, create your unique visualization.
@@ -186,9 +181,8 @@ Using your processed dataset, create your unique visualization.
 #| label: Visualize
 
 coffee_survey |> 
-  select(!ends_with("_notes")) |> 
   pivot_longer(
-    cols = starts_with("coffee_"),
+    cols = starts_with("coffee_") & !ends_with("_notes"),
     names_to = c("coffee", "feature"),
     names_pattern = "coffee_(.)_(.+)"
   ) |> 
