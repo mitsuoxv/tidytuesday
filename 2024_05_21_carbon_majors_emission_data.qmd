@@ -1,0 +1,165 @@
+---
+title: "Carbon Majors Emissions data"
+date: 2024-05-27
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2024-05-21")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+emissions <- tt$emissions
+```
+
+```{r}
+range(emissions$year)
+
+emissions |> 
+  count(parent_entity, sort = TRUE)
+
+emissions |> 
+  count(parent_type, sort = TRUE)
+
+emissions |> 
+  count(commodity, sort = TRUE)
+
+emissions |> 
+  count(production_unit, sort = TRUE)
+
+emissions |> 
+  count(commodity, production_unit, sort = TRUE)
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+No change in CO2 per unit.
+
+```{r}
+#| label: Visualize
+
+emissions |> 
+  group_by(year, commodity, production_unit) |> 
+  summarize(
+    n = n(),
+    production_value = sum(production_value),
+    total_emissions_MtCO2e = sum(total_emissions_MtCO2e),
+    .groups = "drop"
+  ) |> 
+  mutate(
+    co2_per_unit = total_emissions_MtCO2e / production_value,
+    commodity = fct_reorder(commodity, co2_per_unit)
+  ) |> 
+  ggplot(aes(year, co2_per_unit)) +
+  geom_line(aes(color = commodity))
+
+```
+
+```{r}
+emissions |> 
+  filter(str_detect(commodity, "Coal")) |> 
+  summarize(
+    co2_per_unit = sum(total_emissions_MtCO2e) / sum(production_value),
+    .by = commodity
+  ) |> 
+  arrange(desc(co2_per_unit))
+
+p <- emissions |> 
+  filter(
+    str_detect(commodity, "Coal"),
+    year >= 1950
+  ) |> 
+  group_by(parent_type, year, commodity) |> 
+  summarize(
+    n = n(),
+    production_value = sum(production_value),
+    total_emissions_MtCO2e = sum(total_emissions_MtCO2e),
+    co2_per_unit = total_emissions_MtCO2e / production_value,
+    .groups = "drop"
+  ) |> 
+  mutate(
+    commodity = glue::glue("{commodity}\n({round(co2_per_unit, 2)})"),
+    commodity = fct_reorder(commodity, co2_per_unit)
+  ) |> 
+  ggplot(aes(year, production_value)) +
+  geom_area(aes(fill = commodity)) +
+  scale_y_continuous(labels = scales::comma_format(),
+                     expand = expansion(c(0, 0.05), 0)) +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_fill_brewer(palette = "OrRd") +
+  facet_wrap(vars(parent_type)) +
+  labs(x = NULL, y = "Coal production (million tonnes)", fill = NULL,
+       title = "Nation State is struggling to switch to low-emission coals",
+       subtitle = "# in parentheses denotes CO2 emission per production",
+       caption = "Source: Carbon Majors dataset")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/carbon_majors_emissions_data.png", p, width = 8, height = 4)
+
+```
