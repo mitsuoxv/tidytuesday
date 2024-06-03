@@ -1,0 +1,161 @@
+---
+title: "Lisa's Vegetable Garden data"
+date: 2024-06-03
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2024-05-28")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+harvest_2020 <- tt$harvest_2020
+harvest_2021 <- tt$harvest_2021
+planting_2020 <- tt$planting_2020
+planting_2021 <- tt$planting_2021
+spending_2020 <- tt$spending_2020
+spending_2021 <- tt$spending_2021
+```
+
+```{r}
+planting <- bind_rows(
+  planting_2020 |> mutate(year = "2020"),
+  planting_2021 |> mutate(year = "2021")
+)
+
+harvest <- bind_rows(
+  harvest_2020 |> mutate(year = "2020"),
+  harvest_2021 |> mutate(year = "2021")
+)
+
+spending <- bind_rows(
+  spending_2020 |> mutate(year = "2020"),
+  spending_2021 |> mutate(year = "2021")
+)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+No change in CO2 per unit.
+
+```{r}
+#| label: Visualize
+
+spending |> 
+  ggplot(aes(price)) +
+  geom_histogram() +
+  facet_wrap(vars(year), ncol = 1)
+```
+
+```{r}
+harvest |> 
+  group_by(year, vegetable) |> 
+  summarize(weight = sum(weight), .groups = "drop") |> 
+  ggplot(aes(year, weight)) +
+  geom_col(aes(fill = vegetable))
+
+harvest_by_vegetable <- harvest |> 
+  mutate(
+    vegetable = if_else(vegetable == "pumpkin", "pumpkins", vegetable)
+  ) |> 
+  group_by(year, vegetable) |> 
+  summarize(weight = sum(weight), .groups = "drop") |> 
+  arrange(year, desc(weight))
+
+vegetable_main <- harvest_by_vegetable |> 
+  filter(weight > 10000) |> 
+  distinct(vegetable) |> 
+  pull(vegetable)
+
+harvest_by_vegetable |> 
+  filter(vegetable %in% vegetable_main) |> 
+  mutate(vegetable = fct_reorder2(vegetable, year, weight)) |> 
+  ggplot(aes(year, weight)) +
+  geom_line(aes(color = vegetable, group = vegetable))
+
+p <- harvest_by_vegetable |> 
+  filter(vegetable %in% vegetable_main) |> 
+  mutate(
+    vegetable = fct_reorder2(vegetable, year, weight, .desc = FALSE),
+    weight = weight / 1e3
+    ) |> 
+  ggplot(aes(weight, vegetable)) +
+  geom_col(aes(fill = year),
+           position = position_dodge2(preserve = "single", padding = 0)) +
+  scale_x_continuous(expand = expansion(c(0, 0.05), 0)) +
+  scale_fill_manual(values = c("gray80", "tomato")) +
+  guides(fill = guide_legend(reverse = TRUE)) +
+  labs(x = "Harvest (kg)", y = "Main vegetables", fill = "Year",
+       title = "Tomatoes are the most heavily harvested vegetables in 2021,\nbut less than in 2020 in Lisa Lendway's vegetable garden",
+       caption = "Source: {gardenR} package")
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/lisas_vegetable_garden_data.png", p, width = 7, height = 4)
+
+```
