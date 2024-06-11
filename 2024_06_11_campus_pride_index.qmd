@@ -1,0 +1,171 @@
+---
+title: "Campus Pride Index"
+date: 2024-06-11
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2024-06-11")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+pride_index <- tt$pride_index
+pride_index_tags <- tt$pride_index_tags
+```
+
+```{r}
+
+pride_index_merged <- pride_index |> 
+  left_join(pride_index_tags |> select(!campus_location),
+            by = "campus_name") |> 
+  separate_wider_regex(campus_location,
+                       patterns = c(location = "^.*", ", ", state = "..$")) |> 
+  mutate(across(public:other_minority_serving, \(x) if_else(is.na(x), FALSE, x)))
+```
+
+```{r}
+skimr::skim(pride_index_merged)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+No change in CO2 per unit.
+
+```{r}
+#| label: Visualize
+
+state_top9 <- pride_index_merged |> 
+  count(state, sort = TRUE) |> 
+  filter(n > 9)
+
+pride_index_merged |> 
+  inner_join(state_top9, by = "state") |> 
+  left_join(tibble(state = state.abb, state_name = state.name),
+            by = "state") |> 
+  mutate(
+    state_name = str_glue("{state_name} ({n})") |> 
+      fct_reorder(rating)
+  ) |> 
+  ggplot(aes(rating, state_name)) +
+  geom_boxplot(outliers = FALSE) +
+  geom_point(position = position_jitter(width = 0, height = 0.2),
+             alpha = 0.2) +
+  facet_wrap(vars(public))
+```
+
+```{r}
+
+draw_by_feature <- function(feature) {
+  pride_index_merged |> 
+    ggplot(aes(rating)) +
+    geom_bar(aes(fill = {{feature}}), 
+             position = position_dodge(preserve = "single")) +
+    scale_y_continuous(expand = expansion(c(0, 0.1), 0))
+}
+
+draw_by_feature(public)
+draw_by_feature(private)
+draw_by_feature(doctoral)
+draw_by_feature(masters)
+draw_by_feature(baccalaureate)
+draw_by_feature(community)
+draw_by_feature(residential)
+draw_by_feature(nonresidential)
+draw_by_feature(liberal_arts)
+draw_by_feature(technical)
+draw_by_feature(religious)
+draw_by_feature(military)
+draw_by_feature(hbcu)
+draw_by_feature(hispanic_serving)
+draw_by_feature(aapi_serving)
+draw_by_feature(other_minority_serving)
+```
+
+```{r}
+p <- pride_index_merged |> 
+  mutate(
+    public = factor(public, levels = c(TRUE, FALSE),
+                    labels = c("Public", "Non-public")),
+    state2 = factor(state == "NY", levels = c(FALSE, TRUE),
+                    labels = c("States except New York", "New York"))
+  ) |> 
+  ggplot(aes(rating)) +
+  geom_bar(aes(fill = public), 
+           position = position_dodge2(preserve = "single", padding = 0)) +
+  scale_y_continuous(expand = expansion(c(0, 0.1), 0)) +
+  scale_fill_brewer(palette = "Set1") +
+  facet_wrap(vars(state2), ncol = 1, scales = "free_y") +
+  labs(fill = NULL, x = "Ratings", y = "Count",
+       title = "Public college or university tends to have higher ratings\nthan non-public, but it is not the case in New York state",
+       caption = "Source: Campus Pride Index") +
+  theme(legend.position = "top")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/campus_pride_index.png", p, width = 6, height = 5)
+
+```
