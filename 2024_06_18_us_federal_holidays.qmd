@@ -1,0 +1,126 @@
+---
+title: "US Federal Holidays"
+date: 2024-06-18
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2024-06-18")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+federal_holidays <- tt$federal_holidays |> 
+  separate_wider_delim(date, " ", names = c("month", "date")) |> 
+  mutate(month = factor(month, levels = month.name))
+```
+
+```{r}
+library(rvest)
+
+japan_holidays_wiki <- read_html("https://ja.wikipedia.org/wiki/%E5%9B%BD%E6%B0%91%E3%81%AE%E7%A5%9D%E6%97%A5")
+
+japan_holidays_wiki_tables <- japan_holidays_wiki |> 
+  html_elements("table")
+
+japan_holidays_wiki_table <- japan_holidays_wiki_tables[6] |> 
+  html_table()
+
+japan_holidays <- japan_holidays_wiki_table[[1]] |> 
+  filter(str_detect(`適用終了年`, "-")) |> 
+  slice_head(n = 16) |> 
+  mutate(
+    month = parse_number(`期日`),
+    month = month.name[month],
+    month = factor(month, levels = month.name)
+  )
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+No change in CO2 per unit.
+
+```{r}
+#| label: Visualize
+
+p <- bind_rows(
+  federal_holidays |> select(official_name, month) |> mutate(country = "US"),
+  japan_holidays |> select(official_name = `名称`, month) |> mutate(country = "Japan")
+) |> 
+  ggplot(aes(month)) +
+  geom_bar(aes(fill = country), position = position_dodge2(preserve = "single", padding = 0, reverse = TRUE)) +
+  coord_flip() +
+  labs(y = "Number of holidays per month", x = NULL,
+       fill = "County",
+       title = "There are 16 national holidays in Japan,\nwhile 11 federal holidays in the US",
+       caption = "Source: Wikipedia")
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/us_federal_holidays.png", p, width = 6, height = 4)
+```
