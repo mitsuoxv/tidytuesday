@@ -1,0 +1,137 @@
+---
+title: "TidyTuesday Datasets"
+date: 2024-07-02
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2024-07-02")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+tt_datasets <- tt$tt_datasets
+tt_summary <- tt$tt_summary
+tt_urls <- tt$tt_urls
+tt_variables <- tt$tt_variables
+```
+
+```{r}
+tt_datasets |> 
+  count(year, week, dataset_name, sort = TRUE)
+
+tt_datasets
+
+tt_variables |> 
+  count(year, week, dataset_name)
+
+tt_variables |> 
+  mutate(variable = str_to_lower(variable)) |> 
+  count(variable, sort = TRUE) |> View()
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+No change in CO2 per unit.
+
+```{r}
+#| label: Visualize
+
+tt_variables |> 
+  mutate(variable_length = nchar(variable)) |>
+  ggplot(aes(variable_length)) +
+  geom_histogram() +
+  scale_x_log10() +
+  facet_grid(rows = vars(year))
+```
+
+```{r}
+library(ggridges)
+
+p <- tt_variables |> 
+  mutate(
+    variable_length = nchar(variable),
+    variable_length_odd = variable_length %% 2
+  ) |>
+  group_by(year, week, dataset_name) |> 
+  summarize(variable_length_odd_ratio = mean(variable_length_odd),
+            .groups = "drop") |> 
+  ggplot(aes(variable_length_odd_ratio, year)) +
+  geom_density_ridges(aes(group = year, fill = year == 2021), show.legend = FALSE) +
+  geom_vline(xintercept = 0.5, lty = 2) +
+  scale_x_continuous(limits = c(0, 1), labels = scales::percent_format()) +
+  scale_y_continuous(breaks = 2018:2024) +
+  scale_fill_manual(values = c("gray70", "red")) +
+  labs(x = "Ratios of variables whose name lengths are odd in each dataset",
+       y = NULL,
+       title = "Variable name lengths were more likely to be even than odd\nin 2021 datasets",
+       caption = "Sourde: {ttmeta} package")
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/tidy_tuesday_datasets.png", p, width = 7, height = 5)
+```
