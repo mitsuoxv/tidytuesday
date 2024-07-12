@@ -1,0 +1,113 @@
+---
+title: "David Robinson's TidyTuesday Functions"
+date: 2024-07-12
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2024-07-09")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+drob_funs <- tt$drob_funs
+
+drob_funs |> 
+  count(pkgs, sort = TRUE)
+
+drob_funs |> 
+  filter(pkgs == "ggplot") |> 
+  count(funs, sort = TRUE) |> View()
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+No change in CO2 per unit.
+
+```{r}
+#| label: Visualize
+
+p <- drob_funs |> 
+  filter(pkgs == "ggplot", str_detect(funs, "^geom_")) |> 
+  count(funs, sort = TRUE) |> 
+  mutate(funs = fct_reorder(funs, n)) |> 
+  ggplot(aes(n, funs)) +
+  geom_col(aes(fill = funs %in% c("geom_col", "geom_bar")),
+           show.legend = FALSE) +
+  scale_fill_manual(values = c("gray60", "red")) +
+  scale_x_continuous(expand = expansion(add = c(0, 10))) +
+  labs(x = "Number of times David Robinson used\nin his YouTube screencast",
+       y = "geom functions",
+       title = "David Robinson prefers geom_col to geom_bar",
+       caption = "Source: funspotr examples") +
+  theme(axis.text.y = element_text(hjust = 0))
+                    
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/david_robinson_tidy_tuesday_functions.png", p, width = 6, height = 5)
+```
