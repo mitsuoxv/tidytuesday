@@ -110,8 +110,6 @@ ewf_matches |>
 ```{r}
 
 p <- ewf_matches |> 
-  mutate(start_year = parse_number(season)) |> 
-  filter(start_year >= 2014) |> 
   group_by(season, tier) |> 
   summarize(across(home_team_win:draw, mean), .groups = "drop") |> 
   mutate(tier = factor(tier)) |> 
