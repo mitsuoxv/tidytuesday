@@ -1,0 +1,178 @@
+---
+title: "American Idol Data"
+date: 2024-07-30
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2024-07-23")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+auditions <- tt$auditions
+eliminations <- tt$eliminations
+finalists <- tt$finalists
+ratings <- tt$ratings
+seasons <- tt$seasons
+songs <- tt$songs
+```
+
+```{r}
+
+skimr::skim(auditions)
+
+auditions |> 
+  count(season)
+
+auditions |> 
+  separate_wider_delim(audition_city, delim = ", ", too_few = "debug",
+                       names = c("city", "state")) |> 
+  filter(!audition_city_ok) # Bus tour
+
+auditions |> 
+  separate_wider_delim(audition_city, delim = ", ", too_few = "debug",
+                       names = c("city", "state")) |> 
+  filter(audition_city_ok) |> 
+  count(state, sort = TRUE)
+
+auditions |> 
+  separate_wider_delim(audition_city, delim = ", ", too_few = "debug",
+                       names = c("city", "state")) |> 
+  filter(audition_city_ok) |> 
+  summarize(
+    n = sum(!is.na(tickets_to_hollywood)),
+    mean_tickets_to_hollywood = mean(tickets_to_hollywood, na.rm = TRUE),
+    .by = state
+  ) |> 
+  arrange(desc(mean_tickets_to_hollywood))
+```
+
+```{r}
+skimr::skim(eliminations)
+
+eliminations2 <- eliminations |> 
+  filter(!is.na(place))
+
+eliminations2 |> 
+  count(season, place, sort = TRUE)
+
+eliminations2 |> 
+  count(gender)
+
+```
+
+```{r}
+skimr::skim(finalists)
+
+finalists |> 
+  count(Season, sort = TRUE)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+No change in CO2 per unit.
+
+```{r}
+#| label: Visualize
+
+eliminations2 |> 
+  mutate(place2 = parse_number(place)) |> 
+  ggplot(aes(place2)) +
+  geom_bar(aes(fill = gender), position = "dodge") +
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+```{r}
+p <- eliminations2 |> 
+  mutate(place = str_replace(place, "-", "–")) |> 
+  separate_wider_delim(place, delim = "–", names = c("from", "to"),
+                       too_few = "align_start") |> 
+  mutate(
+    to = if_else(is.na(to), from, to),
+    top = case_when(
+      to <= 20 ~ "1~20",
+      .default = "21~"
+    )
+  ) |> 
+  count(top, gender) |> 
+  mutate(
+    gender = factor(gender, levels = c("Male", "Female")),
+    top = fct_reorder(top, parse_number(top))
+  ) |> 
+  ggplot(aes(top, n)) +
+  geom_col(aes(fill = gender), position = "dodge") +
+  scale_fill_manual(values = c("steelblue", "orange")) +
+  scale_y_continuous(expand = expansion(add = c(0, 10))) +
+  labs(x = "Place (or lower place range) contestant finished",
+       y = "Number of contestants", fill = "Gender",
+       title = "Female contestants are more likely to finish in top 20 than male",
+       caption = "Source: American Idol Data")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/american_idol_data.png", p, width = 7, height = 5)
+```
