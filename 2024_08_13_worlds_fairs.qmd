@@ -1,0 +1,154 @@
+---
+title: "World's Fairs"
+date: 2024-08-18
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2024-08-13")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+worlds_fairs <- tt$worlds_fairs
+```
+
+```{r}
+worlds_fairs |> 
+  filter(start_year != end_year)
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+No change in CO2 per unit.
+
+```{r}
+#| label: Visualize
+
+worlds_fairs2 <- worlds_fairs |> 
+  mutate(duration = 12 * (end_year - start_year) + end_month - start_month)
+
+worlds_fairs2 |> 
+  ggplot(aes(duration)) +
+  geom_histogram(binwidth = 1) +
+  facet_wrap(vars(factor(start_month)))
+
+worlds_fairs2 |> 
+  filter(duration == 0)
+
+```
+
+```{r}
+worlds_fairs2 |> 
+  count(category)
+
+worlds_fairs2 |> 
+  ggplot(aes(start_year, visitors)) +
+  geom_line() +
+  facet_wrap(vars(category))
+
+worlds_fairs2 |> 
+  filter(category == "World Expo") |> 
+  ggplot(aes(visitors / duration, start_year)) +
+  geom_segment(aes(yend = start_year, xend = 0)) +
+  geom_point() +
+  geom_text(aes(label = city), vjust = 0, hjust = 0)
+
+p <- worlds_fairs2 |> 
+  filter(category == "World Expo", !is.na(visitors)) |> 
+  mutate(
+    region = case_when(
+      country %in% c("United States", "Canada") ~ "North America",
+      country %in% c("Japan", "People's Republic of China") ~ "Far East",
+      country == "Colony of Victoria" ~ "Oceania",
+      country == "United Arab Emirates" ~ "Middle East",
+      .default = "Europe"
+    ),
+    region = factor(region, levels = c("Europe", "North America", "Oceania", "Middle East", "Far East"))
+  ) |> 
+  ggplot(aes(visitors, factor(start_year))) +
+  geom_col(aes(fill = region)) +
+  geom_text(aes(label = city), vjust = 0.5, hjust = -0.1, size = 3) +
+  scale_x_continuous(expand = expansion(add = c(0, 12))) +
+  labs(x = "Number of visitors (million)", y = "World Expo Year",
+       fill = "Region",
+       title = "Largest visitors in 2010 Shanghai Expo",
+       caption = "Source: List of world expositions (Wikipedia)") +
+  theme(panel.grid.major.y = element_blank())
+
+worlds_fairs2 |> 
+  filter(category == "World Expo", !start_year %in% c(1935, 1958, 1937, 1967, 1986, 1988, 2000)) |> 
+  ggplot(aes(cost, start_year)) +
+  geom_segment(aes(yend = start_year, xend = 0)) +
+  geom_point() +
+  geom_text(aes(label = city), vjust = 0, hjust = 0)
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/worlds_fairs.png", p, width = 7, height = 6)
+```
