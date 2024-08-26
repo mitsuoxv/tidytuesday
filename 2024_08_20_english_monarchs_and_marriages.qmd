@@ -1,0 +1,138 @@
+---
+title: "English Monarchs and Marriages"
+date: 2024-08-26
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2024-08-20")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+english_monarchs_marriages_df <- tt$english_monarchs_marriages_df
+```
+
+```{r}
+english_monarchs_marriages_df |> 
+  count(king_name, sort = TRUE)
+
+english_monarchs_marriages_df |> 
+  count(consort_name, sort = TRUE)
+
+```
+
+```{r}
+
+english_monarchs_marriages_df2 <- english_monarchs_marriages_df |> 
+  mutate(
+    king_name = str_replace_all(king_name, "\\s", " "),
+    across(ends_with("age"), \(x) parse_number(x, na = c("", "NA", "?", "	
+–", "–"))),
+    first_marriage = if_else(king_name == lag(king_name), FALSE, TRUE),
+    first_marriage = if_else(is.na(first_marriage), TRUE, first_marriage)
+  ) |> 
+  separate_wider_delim(king_name, delim = " ",
+                       names = c("king_name_first", "king_name_second"),
+                       too_few = "align_start", too_many = "merge",
+                       cols_remove = FALSE)
+
+english_monarchs_marriages_df2 |> 
+  count(king_name_first, sort = TRUE)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+No change in CO2 per unit.
+
+```{r}
+#| label: Visualize
+
+henry_edward <- english_monarchs_marriages_df2 |> 
+  filter(king_name_first %in% c("Henry", "Edward"))
+
+p <- henry_edward |> 
+  mutate(
+    row = row_number(),
+    king_name = fct_reorder(king_name, row)
+  ) |> 
+  ggplot(aes(king_age, king_name)) +
+  geom_point(aes(color = king_name_first)) +
+  geom_point(aes(colour = king_name_first), shape = 1, size = 3,
+             data = henry_edward |> filter(first_marriage)) +
+  scale_x_continuous(limits = c(0, 60), expand = expansion(add = c(0, 3))) +
+  labs(x = "Ruler's age at marriage", y = NULL,
+       color = "Ruler",
+       title = "Henry tends to marry younger than Edward",
+       subtitle = "Circled point denotes first marriage",
+       caption = "Source: A list of Monarchs by marriage") +
+  theme(axis.text.y = element_text(hjust = 0),
+        legend.position = "top")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/english_monarchs_and_marriages.png", p, width = 6, height = 5)
+```
