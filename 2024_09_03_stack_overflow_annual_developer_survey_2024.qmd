@@ -1,0 +1,315 @@
+---
+title: "Stack Overflow Annual Developer Survey 2024"
+date: 2024-09-04
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2024-09-03")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+qname_levels_single_response_crosswalk <- tt$qname_levels_single_response_crosswalk
+stackoverflow_survey_questions <- tt$stackoverflow_survey_questions
+stackoverflow_survey_single_response <- tt$stackoverflow_survey_single_response
+```
+
+```{r}
+skimr::skim(qname_levels_single_response_crosswalk)
+
+skimr::skim(stackoverflow_survey_questions)
+
+skimr::skim(stackoverflow_survey_single_response)
+```
+
+```{r}
+response_label <- stackoverflow_survey_single_response |> 
+  mutate(across(everything(), as.character)) |> 
+  pivot_longer(-response_id, names_to = "qname", values_to = "level") |> 
+  left_join(qname_levels_single_response_crosswalk |> mutate(across(everything(), as.character)),
+            by = c("qname", "level"))
+
+response_label |> 
+  filter(qname == "main_branch") |> 
+  count(label, sort = TRUE)
+
+response_label |> 
+  filter(qname == "age") |> 
+  count(label, sort = TRUE)
+
+response_label |> 
+  filter(qname == "remote_work") |> 
+  count(label, sort = TRUE)
+
+response_label |> 
+  filter(qname == "years_code") |> 
+  count(level, sort = TRUE)
+
+response_label |> 
+  filter(qname == "years_code_pro") |> 
+  count(level, sort = TRUE)
+
+response_label |> 
+  filter(qname == "dev_type") |> 
+  count(label, sort = TRUE)
+
+response_label |> 
+  filter(qname == "org_size") |> 
+  count(label, sort = TRUE)
+
+response_label |> 
+  filter(qname == "purchase_influence") |> 
+  count(label, sort = TRUE)
+
+response_label |> 
+  filter(qname == "buildvs_buy") |> 
+  count(label, sort = TRUE)
+
+response_label |> 
+  filter(qname == "country") |> 
+  count(level, sort = TRUE)
+
+response_label |> 
+  filter(qname == "currency") |> 
+  count(level, sort = TRUE)
+
+response_label |> 
+  filter(qname == "comp_total") |> 
+  count(level, sort = TRUE)
+
+response_label |> 
+  filter(qname == "so_visit_freq") |> 
+  count(label, sort = TRUE)
+
+response_label |> 
+  filter(qname == "so_account") |> 
+  count(label, sort = TRUE)
+
+response_label |> 
+  filter(qname == "so_part_freq") |> 
+  count(label, sort = TRUE)
+
+response_label |> 
+  filter(qname == "so_comm") |> 
+  count(label, sort = TRUE)
+
+response_label |> 
+  filter(qname == "ai_select") |> 
+  count(label, sort = TRUE)
+
+response_label |> 
+  filter(qname == "ai_sent") |> 
+  count(label, sort = TRUE)
+
+response_label |> 
+  filter(qname == "ai_acc") |> 
+  count(label, sort = TRUE)
+
+response_label |> 
+  filter(qname == "ai_complex") |> 
+  count(label, sort = TRUE)
+
+response_label |> 
+  filter(qname == "ai_threat") |> 
+  count(label, sort = TRUE)
+
+response_label |> 
+  filter(qname == "survey_length") |> 
+  count(label, sort = TRUE)
+
+response_label |> 
+  filter(qname == "survey_ease") |> 
+  count(label, sort = TRUE)
+
+response_label |> 
+  filter(qname == "converted_comp_yearly") |> 
+  count(level, sort = TRUE)
+
+response_label |> 
+  filter(qname == "r_used") |> 
+  count(level, sort = TRUE)
+
+response_label |> 
+  filter(qname == "r_want_to_use") |> 
+  count(level, sort = TRUE)
+
+```
+
+```{r}
+response_label2 <- response_label |> 
+  mutate(value = if_else(qname %in% c("years_code", "years_code_pro", "country", "currency", "comp_total", "converted_comp_yearly", "r_used", "r_want_to_use"), level, label)) |> 
+  select(!c(level, label))
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+No change in CO2 per unit.
+
+```{r}
+#| label: Visualize
+
+cross_count <- function(x, y) {
+  response_label2 |> 
+    filter(qname %in% c(rlang::as_name(enquo(x)), rlang::as_name(enquo(y)))) |>
+    pivot_wider(names_from = qname, values_from = value) |> 
+    count({{x}}, {{y}}) |> 
+    ggplot(aes(n, {{y}})) +
+    geom_col() +
+    facet_wrap(vars({{x}}), scales = "free_x")
+}
+
+cross_count(r_used, ai_select)
+cross_count(r_used, ai_sent)
+cross_count(r_used, ai_acc)
+cross_count(r_used, ai_complex)
+cross_count(r_used, ai_threat)
+
+cross_count(main_branch, ai_select)
+cross_count(main_branch, ai_sent)
+cross_count(main_branch, ai_acc)
+cross_count(main_branch, ai_complex)
+cross_count(main_branch, ai_threat)
+
+cross_count(age, ai_select)
+cross_count(age, ai_sent)
+cross_count(age, ai_acc)
+cross_count(age, ai_complex)
+cross_count(age, ai_threat)
+
+cross_count(remote_work, ai_select)
+cross_count(remote_work, ai_sent)
+cross_count(remote_work, ai_acc)
+cross_count(remote_work, ai_complex)
+cross_count(remote_work, ai_threat)
+
+cross_count(ed_level, ai_select)
+cross_count(ed_level, ai_sent)
+cross_count(ed_level, ai_acc)
+cross_count(ed_level, ai_complex)
+cross_count(ed_level, ai_threat)
+
+cross_count(dev_type, ai_select)
+cross_count(dev_type, ai_sent)
+
+cross_count(org_size, ai_sent)
+cross_count(org_size, ai_acc)
+cross_count(org_size, ai_complex)
+cross_count(org_size, ai_threat)
+
+cross_count(purchase_influence, ai_sent)
+cross_count(purchase_influence, ai_acc)
+cross_count(purchase_influence, ai_complex)
+cross_count(purchase_influence, ai_threat)
+
+cross_count(buildvs_buy, ai_sent)
+cross_count(buildvs_buy, ai_acc)
+cross_count(buildvs_buy, ai_complex)
+cross_count(buildvs_buy, ai_threat)
+
+cross_count(so_visit_freq, ai_sent)
+cross_count(so_visit_freq, ai_acc)
+cross_count(so_visit_freq, ai_complex)
+cross_count(so_visit_freq, ai_threat)
+
+cross_count(so_account, ai_sent)
+cross_count(so_account, ai_acc)
+cross_count(so_account, ai_complex)
+cross_count(so_account, ai_threat)
+
+cross_count(so_part_freq, ai_sent)
+cross_count(so_part_freq, ai_acc)
+cross_count(so_part_freq, ai_complex)
+cross_count(so_part_freq, ai_threat)
+
+cross_count(so_comm, ai_sent)
+cross_count(so_comm, ai_acc)
+cross_count(so_comm, ai_complex)
+cross_count(so_comm, ai_threat)
+
+```
+
+```{r}
+
+p <- response_label2 |> 
+  filter(qname %in% c("age", "ai_select")) |>
+  pivot_wider(names_from = qname, values_from = value) |> 
+  count(age, ai_select) |> 
+  mutate(age = fct_relevel(age, "Under 18 years old")) |> 
+  ggplot(aes(n, ai_select)) +
+  geom_col(aes(fill = ai_select), show.legend = FALSE) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.05))) +
+  facet_wrap(vars(age), scales = "free_x") +
+  labs(x = "Number of respondents", y = "Do you currently use AI tools\nin your development process?",
+       title = "The older a developer is, the more reluctant he or she is\nto use AI tools",
+       caption = "Source: Stack Overflow Annual Developer Survey 2024") +
+  theme(panel.grid.major.y = element_blank())
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/stack_overflow_annual_developer_survey_2024.png", p, width = 8, height = 6)
+```
