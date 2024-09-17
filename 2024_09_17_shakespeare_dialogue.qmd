@@ -1,0 +1,153 @@
+---
+title: "Shakespeare Dialogue"
+date: 2024-09-17
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2024-09-17")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+hamlet <- tt$hamlet
+macbeth <- tt$macbeth
+romeo_juliet <- tt$romeo_juliet
+```
+
+```{r}
+stories <- bind_rows(
+  hamlet |> mutate(story = "Hamlet"),
+  macbeth |> mutate(story = "Macbeth"),
+  romeo_juliet |> mutate(story = "Romeo and Juliet")
+)
+```
+
+```{r}
+
+stories |> 
+  summarize(stage_direction_rate = sum(is.na(line_number)) / n(), .by = story)
+
+n_dialogue_by_story <- stories |> 
+  summarize(n_dialogue = sum(!is.na(line_number)), .by = story)
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+No change in CO2 per unit.
+
+```{r}
+#| label: Visualize
+
+paired_colors <- tibble(
+  row = 1:6,
+  color = c("#e31a1c", "#fb9a99", "#33a02c", "#b2df8a",
+  "#1f78b4", "#a6cee3")
+)
+
+p <- stories |> 
+  filter(!is.na(line_number)) |> 
+  count(story, character) |> 
+  left_join(n_dialogue_by_story, by = "story") |> 
+  mutate(
+    character_rate = n / n_dialogue,
+    character = character |> 
+      fct_lump_n(n = 15, w = character_rate) |> 
+      fct_reorder(character_rate) |> 
+      fct_rev()
+  ) |> 
+  group_by(story, character) |> 
+  summarize(character_rate = sum(character_rate), .groups = "drop_last") |> 
+  mutate(
+    row = row_number(),
+    cum_rate = cumsum(character_rate),
+    y_position = (cum_rate + lag(cum_rate)) / 2,
+    y_position = if_else(is.na(y_position), cum_rate / 2, y_position)
+  ) |> 
+  ungroup() |> 
+  left_join(paired_colors, by = "row") |> 
+  mutate(
+    color = if_else(character == "Other", "gray70", color),
+    color = fct_reorder(color, row)
+  ) |> 
+  ggplot(aes(x = story)) +
+  geom_col(aes(y = character_rate, fill = color),
+           position = position_stack(reverse = TRUE),
+           show.legend = FALSE) +
+  geom_text(aes(y = y_position, label = character), 
+            vjust = 0.5, color = "white") +
+  scale_fill_identity() +
+  scale_y_continuous(expand = expansion(), labels = scales::percent_format()) +
+  labs(x = NULL, y = "Share of dialogues by actor",
+       title = "Hamlet > Macbeth > Romeo in share of dialogues",
+       caption = "Source: The Complete Works of William Shakespeare")
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/shakespeare_dialogue.png", p, width = 6, height = 4)
+```
