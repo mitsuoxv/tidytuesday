@@ -1,0 +1,136 @@
+---
+title: "International Mathematical Olympiad Data"
+date: 2024-09-30
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2024-09-24")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+country_results_df <- tt$country_results_df
+individual_results_df <- tt$individual_results_df
+timeline_df <- tt$timeline_df
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+No change in CO2 per unit.
+
+```{r}
+#| label: Visualize
+
+timeline_df |> 
+  filter(year >= 1969) |> 
+  mutate(female_rate = female_contestant / all_contestant) |> 
+  ggplot(aes(year, female_rate)) +
+  geom_line()
+
+timeline_df |> 
+  pivot_longer(male_contestant:female_contestant) |> 
+  ggplot(aes(year, value)) +
+  geom_col() +
+  facet_wrap(vars(name))
+
+```
+
+```{r}
+
+library(ggrepel)
+
+female_rate_by_country <- country_results_df |> 
+  mutate(which_na = case_when(
+    is.na(team_size_male) & is.na(team_size_female) ~ "both",
+    is.na(team_size_male) ~ "male",
+    is.na(team_size_female) ~ "female",
+    .default = "none"
+  )) |> 
+  filter(which_na != "both") |> 
+  mutate(
+    team_size_male = if_else(which_na == "male", team_size_all - team_size_female, team_size_male),
+    team_size_female = if_else(which_na == "female", team_size_all - team_size_male, team_size_female)
+  ) |> 
+  summarize(across(starts_with("team_size"), sum), .by = country) |> 
+  mutate(female_rate = team_size_female / team_size_all) |> 
+  arrange(female_rate)
+
+p <- female_rate_by_country |> 
+  filter(team_size_all > 200) |> 
+  ggplot(aes(team_size_all, female_rate)) +
+  geom_point() +
+  geom_text_repel(aes(label = country), size = 3, max.overlaps = 15) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(x = "Total number of contestants", y = "Share of female contestants",
+       title = "Japan has the lowest share of female contestants\nin International Mathematical Olympiad",
+       subtitle = "Among countries with more than 200 contestants",
+       caption = "Source: IMO Team and Individual Results")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/international_mathematical_olympiad.png", p, width = 6, height = 5)
+```
