@@ -1,0 +1,183 @@
+---
+title: "National Park Species"
+date: 2024-10-08
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2024-10-08")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+most_visited_nps_species_data <- tt$most_visited_nps_species_data
+```
+
+```{r}
+skimr::skim(most_visited_nps_species_data)
+
+most_visited_nps_species_data |> 
+  count(TaxonRecordStatus)
+
+most_visited_nps_species_data |> 
+  count(RecordStatus)
+
+most_visited_nps_species_data |> 
+  count(Occurrence)
+
+most_visited_nps_species_data |> 
+  count(ParkAccepted)
+
+most_visited_nps_species_data |> 
+  count(TaxonRecordStatus, RecordStatus, Occurrence, ParkAccepted)
+
+most_visited_nps_species_data |> 
+  filter(!ParkAccepted) |> 
+  count(TaxonRecordStatus, RecordStatus, Occurrence)
+
+most_visited_nps_species_data |> 
+  count(RecordStatus, ParkAccepted)
+
+most_visited_nps_species_data |> 
+  filter(RecordStatus == "Approved") |> 
+  count(TaxonRecordStatus, Occurrence)
+
+
+```
+
+```{r}
+approved_active_present_species <- most_visited_nps_species_data |> 
+  filter(
+    RecordStatus == "Approved",
+    TaxonRecordStatus == "Active",
+    Occurrence %in% c("Present", "Probably Present")
+  )
+
+skimr::skim(approved_active_present_species)
+
+approved_active_present_species |> 
+  count(ParkCode, ParkName)
+
+approved_active_present_species |> 
+  filter(CategoryName == "Mammal") |> 
+  count(Order, Family, SciName)
+
+approved_active_present_species |> 
+  count(Nativeness)
+
+approved_active_present_species |> 
+  count(ParkCode, Abundance)
+
+```
+
+```{r}
+approved_active_present_species |> 
+  count(CategoryName, !is.na(CommonNames)) |> View()
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+Higher rating player tends to win.
+
+```{r}
+#| label: Visualize
+
+count_fam <- approved_active_present_species |> 
+  unite(cat_ord_fam, CategoryName, Order, Family, sep = "_",
+        remove = FALSE) |> 
+  count(ParkName, cat_ord_fam) |> 
+  mutate(
+    ParkName = str_remove(ParkName, " National Park")
+  )
+
+p <- count_fam |> 
+  expand(ParkName, cat_ord_fam) |> 
+  left_join(count_fam, by = c("ParkName", "cat_ord_fam")) |> 
+  separate_wider_delim(cat_ord_fam, delim = "_", 
+                       names = c("cat", "ord_fam"),
+                       too_many = "merge") |> 
+  group_by(ParkName, cat) |> 
+  summarize(family_cover_rate = mean(!is.na(n)), .groups = "drop") |> 
+  ggplot(aes(family_cover_rate, ParkName)) +
+  geom_col(aes(fill = cat), show.legend = FALSE) +
+  scale_x_continuous(labels = scales::percent_format(),
+                     expand = expansion(mult = c(0, 0))) +
+  facet_wrap(vars(cat)) +
+  labs(x = "Specie family cover rate", y = "National Parks",
+       title = "Great Smoky Mountains is the most eager national park\nto find species over almost all categories",
+       subtitle = "Approved, active, and (probably) present species",
+       caption = "NPSpecies - The National Park Service biodiversity database") +
+  theme(
+    panel.grid.major.y = element_blank(),
+    axis.text.y = element_text(size = 6),
+    strip.text = element_text(size = 8)
+  )
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/national_park_species.png", p, width = 7, height = 7)
+```
