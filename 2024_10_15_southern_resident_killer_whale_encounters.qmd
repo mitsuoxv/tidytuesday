@@ -1,0 +1,154 @@
+---
+title: "Southern Resident Killer Whale Encounters"
+date: 2024-10-17
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2024-10-15")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+orcas <- tt$orcas
+
+skimr::skim(orcas)
+```
+
+```{r}
+
+orcas |> 
+  count(year, sort = TRUE)
+
+orcas |> 
+  count(vessel, sort = TRUE)
+
+orcas |> 
+  count(year, vessel, sort = TRUE)
+
+```
+
+```{r}
+orcas |> 
+  count(duration, sort = TRUE)
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+orcas |> 
+  ggplot(aes(year)) +
+  geom_bar(aes(fill = vessel), show.legend = FALSE)
+```
+
+```{r}
+
+orcas2 <- orcas |> 
+  mutate(duration_s = parse_number(duration))
+
+orcas2 |> 
+  ggplot(aes(duration_s)) +
+  geom_histogram(binwidth = 250)
+
+orcas2 |> 
+  filter(duration_s < 0) |> View()
+
+orcas3 <- orcas2 |> 
+  mutate(duration_s = if_else(duration_s <0, duration_s + 43200, duration_s))
+
+orcas3 |> 
+  ggplot(aes(duration_s)) +
+  geom_histogram(binwidth = 250)
+
+orcas3 |> 
+  filter(duration_s > 27000) |> View() # Looks like input mistakes
+
+p <- orcas3 |> 
+  filter(
+    duration_s < 27000,
+    vessel %in% c("Orcinus", "Mike 1"),
+    year <= 2023
+  ) |> 
+  mutate(duration_m = duration_s / 60) |> 
+  ggplot(aes(duration_m)) +
+  geom_histogram(aes(fill = vessel), binwidth = 10, boundary = 0,
+                 show.legend = FALSE) +
+  scale_y_continuous(expand = expansion(add = c(0, 1))) +
+  scale_x_continuous(expand = expansion(add = c(0, 0)),
+                     breaks = 0:6 * 60) +
+  facet_wrap(vars(vessel), ncol = 1) +
+  labs(x = "Orca encounter duration in minutes", y = "Counts",
+       title = "Orcinus tends to observe orcas longer than Mike 1",
+       subtitle = "Orcinus and Mike 1 are two main vessels. Years from 2017 to 2023",
+       caption = "Source: Center for Whale Research")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/southern_resident_killer_whale_encounters.png", p, width = 6, height = 4)
+```
