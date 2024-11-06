@@ -1,0 +1,135 @@
+---
+title: "Democracy and Dictatorship"
+date: 2024-11-06
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2024-11-05")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+democracy_data <- tt$democracy_data
+```
+
+```{r}
+skimr::skim(democracy_data)
+```
+
+```{r}
+democracy_data |> 
+  filter(country_code == "JPN") |> View()
+
+range(democracy_data$year)
+
+democracy_data |> 
+  filter(is.na(is_democracy)) |> View()
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+democracy_data2 <- democracy_data |> 
+  filter(!is.na(is_democracy)) |> 
+  group_by(country_code) |> 
+  mutate(change_democracy = is_democracy - lag(is_democracy)) |> 
+  ungroup()
+
+lose_democracy_country_code <- democracy_data2 |> 
+  filter(change_democracy == -1) |>
+  distinct(country_code) |> 
+  pull(country_code)
+
+last_lose_year <- democracy_data2 |> 
+  filter(change_democracy == -1) |> 
+  group_by(country_code) |> 
+  slice_max(year, n = 1) |> 
+  ungroup() |> 
+  select(country_code, lost_year = year)
+
+p <- democracy_data2 |> 
+  filter(country_code %in% lose_democracy_country_code) |> 
+  left_join(last_lose_year, by = "country_code") |> 
+  filter(lost_year > 2000) |> 
+  mutate(country_name = fct_reorder(country_name, lost_year)) |> 
+  ggplot(aes(year, country_name)) +
+  geom_point(aes(color = is_democracy), shape = 15) +
+  scale_x_continuous(expand = expansion(add = c(1, 1))) +
+  labs(x = NULL, y = "Countries which lost democracy\nlater than 2000",
+       color = "Democracy?",
+       title = "Some countries lose democracy,\nand some of them regain it",
+       caption = "Source: democracyData R Package")
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/democracy_and_dictatorship.png", p, width = 7, height = 4)
+```
