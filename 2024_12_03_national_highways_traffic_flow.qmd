@@ -105,6 +105,7 @@ p <- A64_traffic |>
   facet_wrap(vars(weekday2)) +
   labs(x = NULL, y = "Number of vehicles",
        title = "Twin traffic peaks (morning and evening) in weekdays, and\none peak (noon) in weekends and holidays at a certain A64 site",
+       subtitle = "Observed in May 2021",
        caption = "Note: TAME Site 30361338 on link A64 eastbound\nbetween B1248 near Norton-on-Derwent (east) and B1249\n- GPS Ref: 485338-474373- Eastbound\nSource: WebTRIS Traffic Flow API")
 ```
 
