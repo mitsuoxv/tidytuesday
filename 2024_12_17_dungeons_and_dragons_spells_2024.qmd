@@ -1,0 +1,142 @@
+---
+title: "Dungeons and Dragons Spells (2024)"
+date: 2024-12-17
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2024-12-17")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+spells <- tt$spells
+
+skimr::skim(spells)
+```
+
+```{r}
+spells |> 
+  count(level, sort = TRUE)
+
+spells |> 
+  count(school, sort = TRUE)
+
+spells |> 
+  count(school, level, sort = TRUE)
+
+spells |> 
+  group_by(school) |> 
+  summarize(across(bard:wizard, mean)) |> 
+  ungroup()
+
+spells |> 
+  group_by(school) |> 
+  summarize(across(action:ritual, mean)) |> 
+  ungroup()
+
+spells |> 
+  count(range, sort = TRUE)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+p <- spells |> 
+  separate_wider_delim(range, " ",
+                       names = c("distance", "unit"),
+                       too_few = "align_end") |> 
+  mutate(
+    range2 = case_when(
+    unit %in% c("Self", "Touch") ~ unit,
+    unit == "feet" & distance < 60 ~ "< 60 feet",
+    unit == "feet" & distance >= 60 ~ ">= 60 feet",
+    .default = "Miles"
+    ),
+    range2 = range2 |> 
+      str_wrap(width = 6) |> 
+      fct_relevel("Self", "Touch"),
+    school = str_to_title(school)
+  ) |> 
+  ggplot(aes(range2)) +
+  geom_bar(aes(fill = range2), show.legend = FALSE) +
+  scale_y_continuous(breaks = 0:2 * 10) +
+  scale_fill_brewer(palette = "RdPu") +
+  facet_wrap(vars(school)) +
+  labs(x = "Range of spell effect", y = "Number of spells",
+       title = "Conjuration and Evocation have similar ranges",
+       caption = "Note: 'Miles' includes 'Sight', 'Special' and 'Unlimited'\nSource: D&D Free Rules (2024), Spell Descriptions") +
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        strip.background = element_rect(fill = "white", color = "gray50"),
+        strip.text = element_text(color = "black"))
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/dungeons_and_dragons_spells_2024.png", p, width = 7, height = 5)
+```
