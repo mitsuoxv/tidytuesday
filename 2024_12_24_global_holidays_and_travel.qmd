@@ -1,0 +1,193 @@
+---
+title: "Global Holidays and Travel"
+date: 2024-12-24
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2024-12-24")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+global_holidays <- tt$global_holidays |> 
+  janitor::clean_names()
+
+monthly_passengers <- tt$monthly_passengers |> 
+  janitor::clean_names()
+```
+
+```{r}
+skimr::skim(global_holidays)
+
+skimr::skim(monthly_passengers)
+```
+
+```{r}
+global_holidays |> 
+  filter(iso3 == "JPN") |> 
+  count(type, sort = TRUE)
+
+monthly_passengers |> 
+  summarize(avail = sum(!is.na(total_os)), .by = iso3) |> 
+  arrange(desc(avail)) |> View()
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+draw_by_iso3 <- function(country) {
+  global_holidays |> 
+    filter(iso3 == country, type == "Public holiday") |> 
+    mutate(
+      year = year(date),
+      month = month(date)
+    ) |> 
+    count(year, month, sort = TRUE) |> 
+    left_join(monthly_passengers |> filter(iso3 == country), by = c("year", "month")) |> 
+    filter(!is.na(total_os)) |> 
+    ggplot(aes(n, total_os)) +
+    geom_point(aes(color = factor(year))) +
+    facet_wrap(vars(factor(month)))
+}
+
+draw_by_iso3("JPN")
+
+holidays_travel <- global_holidays |> 
+  filter(type == "Public holiday") |> 
+  mutate(
+    year = year(date),
+    month = month(date)
+  ) |> 
+  count(iso3, year, month, sort = TRUE) |> 
+  filter(!(iso3 == "TWN" & year == 2014)) |> # exclude strange numbers
+  left_join(monthly_passengers, by = c("iso3", "year", "month")) |> 
+  mutate(month = factor(month)) |> 
+  group_by(iso3, month, n) |> 
+  summarize(total_os_avg = mean(total_os, na.rm = TRUE), .groups = "drop") |> 
+  filter(!is.na(total_os_avg))
+
+holidays_travel |> 
+  group_by(iso3, month) |> 
+  summarize(diff = last(total_os_avg) - first(total_os_avg), .groups = "drop") |> 
+  group_by(iso3) |> 
+  summarize(
+    n_month_plus = sum(diff > 0),
+    n_month_minus = sum(diff < 0),
+    n_month_net_plus = n_month_plus - n_month_minus
+  ) |> 
+  arrange(desc(n_month_net_plus))
+
+draw_by_iso3("MDA")
+draw_by_iso3("KOS")
+draw_by_iso3("GIB")
+draw_by_iso3("HKG")
+draw_by_iso3("HUN")
+draw_by_iso3("TWN")
+draw_by_iso3("ISL")
+
+monthly_passengers |> 
+  filter(iso3 == "TWN")
+
+global_holidays |> 
+  filter(iso3 == "TWN")
+
+```
+
+```{r}
+
+p <- holidays_travel |> 
+  group_by(iso3, month) |> 
+  mutate(
+    holiday_increase = n - lag(n),
+    travel_growth_rate = (total_os_avg - lag(total_os_avg)) / holiday_increase / total_os_avg
+  ) |> 
+  ungroup() |> 
+  filter(!is.na(travel_growth_rate)) |> 
+  mutate(mean = mean(travel_growth_rate), .by = month) |> 
+  mutate(month = factor(month, labels = month.name)) |> 
+  ggplot(aes(travel_growth_rate)) +
+  geom_histogram(binwidth = 0.1) +
+  geom_vline(aes(xintercept = mean), color = "red") +
+  geom_vline(xintercept = 0, color = "gray80") +
+  scale_x_continuous(labels = scales::percent_format()) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+  facet_wrap(vars(month)) +
+  labs(x = "Air passengers' growth rate per one more public holiday",
+       y = "Area-month counts",
+       title = "From January to March, one more public holiday leads to more air passengers",
+       subtitle = "Vertical red line denotes mean",
+       caption = "Note: Excludes Taiwan 2014 air passengers, as they are too small\nSource: WorldPop Hub") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/global_holidays_and_travel.png", p, width = 8, height = 5)
+```
