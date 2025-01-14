@@ -142,7 +142,7 @@ p <- same_words_in_talk_title |>
   labs(x = "Number of same words in 2023 and 2024 talk titles",
        y = NULL,
        title = "8 out of 23 speakers who talked in both 2023 and 2024\nused same words in talk titles",
-       caption = "Note: excludes stopwords\nSourde: posit::conf attendee portal 2023, posit::conf attendee portal 2024") +
+       caption = "Note: excludes stopwords\nSource: posit::conf attendee portal 2023, posit::conf attendee portal 2024") +
   theme(panel.grid.minor.x = element_blank(),
         panel.grid.major.y = element_blank())
 ```
