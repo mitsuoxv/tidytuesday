@@ -1,0 +1,158 @@
+---
+title: "Posit::conf talks"
+date: 2025-01-14
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2025-01-14")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+conf2023 <- tt$conf2023
+conf2024 <- tt$conf2024
+
+```
+
+```{r}
+
+skimr::skim(conf2023)
+skimr::skim(conf2024)
+
+```
+
+```{r}
+conf2023 |> 
+  count(speaker_name, sort = TRUE)
+
+conf2024 |> 
+  count(speaker_name, sort = TRUE)
+
+conf2023 |> 
+  count(session_type, sort = TRUE)
+
+conf2023 |> 
+  filter(session_type == "keynote")
+```
+
+```{r}
+# 23 speakers talked in both 2023 and 2024 
+
+both_speakers <- bind_rows(
+  conf2023 |> 
+    select(speaker_name, talk_title = session_title, description = session_abstract) |> 
+    mutate(year = 2023),
+  conf2024 |> 
+    select(speaker_name, talk_title, description) |> 
+    mutate(year = 2024)
+) |> 
+  mutate(n = n(), .by = speaker_name) |> 
+  filter(n == 2) |> 
+  mutate(same_year = year[1] == year[2], .by = speaker_name) |> 
+  filter(!same_year) |> 
+  arrange(speaker_name)
+
+```
+
+```{r}
+library(tidytext)
+
+same_words_in_talk_title <- both_speakers |>
+  unnest_tokens(word, talk_title) |> 
+  select(speaker_name, year, word) |> 
+  anti_join(stop_words, by = "word") |> 
+  distinct(speaker_name, year, word) |>
+  group_by(speaker_name, word) |> 
+  mutate(n = n()) |> 
+  ungroup() |> 
+  filter(n > 1, year == 2024) |> 
+  select(speaker_name, word)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+p <- same_words_in_talk_title |> 
+  mutate(n = n(), x = row_number(), .by = speaker_name) |> 
+  mutate(speaker_name = fct_reorder(speaker_name, n)) |> 
+  ggplot(aes(n, speaker_name)) +
+  geom_text(aes(label = word, x = x), hjust = 1) +
+  scale_x_continuous(breaks = 0:3, limits = c(0, 3),
+                     expand = expansion(add = c(0, 0))) +
+  labs(x = "Number of same words in 2023 and 2024 talk titles",
+       y = NULL,
+       title = "8 out of 23 speakers who talked in both 2023 and 2024\nused same words in talk titles",
+       caption = "Note: excludes stopwords\nSourde: posit::conf attendee portal 2023, posit::conf attendee portal 2024") +
+  theme(panel.grid.minor.x = element_blank(),
+        panel.grid.major.y = element_blank())
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/posit_conf_talks.png", p, width = 7, height = 4)
+```
