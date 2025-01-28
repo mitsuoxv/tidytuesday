@@ -1,0 +1,116 @@
+---
+title: "Water Insecurity"
+date: 2025-01-28
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2025-01-28")
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+water_insecurity_2022 <- tt$water_insecurity_2022
+water_insecurity_2023 <- tt$water_insecurity_2023
+```
+
+```{r}
+
+skimr::skim(water_insecurity_2022)
+skimr::skim(water_insecurity_2023)
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+p <- water_insecurity_2022 |> 
+  filter(!is.na(percent_lacking_plumbing), percent_lacking_plumbing != 0) |> 
+  select(geoid, name, percent_lacking_plumbing_2022 = percent_lacking_plumbing) |> 
+  inner_join(water_insecurity_2023 |> 
+                 filter(!is.na(percent_lacking_plumbing), percent_lacking_plumbing != 0) |> 
+               select(geoid, percent_lacking_plumbing_2023 = percent_lacking_plumbing), 
+             by = "geoid") |> 
+  ggplot(aes(percent_lacking_plumbing_2022, percent_lacking_plumbing_2023)) +
+  geom_point(alpha = 1/4) +
+  geom_abline(slope = 1, intercept = 0, lty = 2) +
+  geom_smooth(method = "lm", se = FALSE) +
+  scale_x_log10() +
+  scale_y_log10() +
+  coord_fixed() +
+  labs(x = "2022 (log scale)", y = "2023 (log scale)",
+       title = "Lack of plumbing tends to increase in counties\nwith less than around 0.10 lacking percent, and\ndecrease in counties with more than that\nfrom 2022 to 2023",
+       subtitle = "Percent of population lacking plumbing facilities",
+       caption = "Source: US Census Data from tidycensus") +
+  theme(panel.grid.minor = element_blank(),
+        plot.title.position = "plot")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/water_insecurity.png", p, width = 7, height = 5)
+```
