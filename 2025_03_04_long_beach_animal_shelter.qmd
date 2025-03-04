@@ -1,0 +1,154 @@
+---
+title: "Long Beach Animal Shelter"
+date: 2025-03-04
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+# tt <- tt_load("2025-03-04")
+
+longbeach <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-03-04/longbeach.csv')
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+# tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+glimpse(longbeach)
+
+skimr::skim(longbeach)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+library(sf)
+
+longbeach_points <- longbeach |> 
+  select(longitude, latitude) |> 
+  as.matrix()
+
+dim(longbeach_points)
+N <- nrow(longbeach_points)
+longbeach_points[1, ]
+
+longbeach_multipoint <- vector("list", length = N)
+
+for (i in 1:N) {
+  longbeach_multipoint[[i]] <- longbeach_points[i, ] |> st_point()
+} 
+
+longbeach_geom <- st_sfc(longbeach_multipoint, crs = "EPSG:4326")
+
+longbeach_sf <- st_sf(longbeach, geometry = longbeach_geom)
+```
+
+```{r}
+longbeach2 <- longbeach |> 
+  mutate(duration = outcome_date - intake_date)
+```
+
+```{r}
+longbeach2 |> 
+  count(intake_condition, sort = TRUE)
+
+longbeach2 |> 
+  count(animal_type, sort = TRUE)
+```
+
+```{r}
+range(longbeach2$intake_date)
+range(longbeach2$outcome_date, na.rm = TRUE)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+longbeach_sf |> 
+  filter(between(longitude, -120, -115)) |> 
+  ggplot() +
+  geom_sf(aes(color = was_outcome_alive), alpha = 1) 
+```
+
+```{r}
+p <- longbeach |> 
+  filter(animal_type %in% c("cat", "dog"), !is.na(outcome_date)) |> 
+  mutate(
+    intake_normal = if_else(intake_condition == "normal", "Normal", "Abnormal"),
+    intake_normal = factor(intake_normal, levels = c("Normal", "Abnormal")),
+    outcome = if_else(was_outcome_alive, "Alive", "Dead"),
+    outcome = factor(outcome, levels = c("Dead", "Alive")),
+    animal_type = str_to_title(animal_type)
+  ) |> 
+  ggplot(aes(intake_normal)) +
+  geom_bar(aes(fill = outcome)) +
+  scale_fill_manual(values = c("darkred", "steelblue")) +
+  scale_y_continuous(expand = expansion(add = c(0, 200))) +
+  facet_wrap(vars(animal_type)) +
+  labs(x = "Intake condition", y = "Counts, 2017-2024", fill = "Outcome",
+       title = "Cats are more likely to be taken in abnormal conditions\nto Animal Care Services, and die than dogs",
+       caption = "Source: City of Long Beach Animal Care Services") +
+  theme(panel.grid.major.x = element_blank(),
+        plot.caption.position = "plot",
+        strip.background = element_rect(fill = "white", color = "gray50"),
+        strip.text = element_text(color = "black"))
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/long_beach_animal_shelter.png", p, width = 6, height = 4)
+```
