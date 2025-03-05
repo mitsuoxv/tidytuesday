@@ -69,6 +69,13 @@ Explore the data and process it into a nice format for plotting! Access each dat
 
 library(sf)
 
+longbeach_sf <- longbeach |> 
+  st_as_sf(coords = c("longitude", "latitude"), crs = "EPSG:4326",
+           remove = FALSE) # set coordinates and CRS
+```
+
+```{r}
+#| eval: false
 longbeach_points <- longbeach |> 
   select(longitude, latitude) |> 
   as.matrix()
