@@ -1,0 +1,162 @@
+---
+title: "Timely and Effective Care by US State"
+date: 2025-04-09
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2025-04-08")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+care_state <- tt$care_state
+
+skimr::skim(care_state)
+```
+
+22 measurements
+
+```{r}
+care_state |> 
+  count(measure_id, measure_name, start_date, end_date, sort = TRUE) |> View()
+```
+
+"AS" American Samoa
+"DC" District of Columbia
+"GU" Guam
+"MP" Northern Mariana Islands
+"PR" Puerto Rico
+"VI" Virgin Islands, U.S.
+
+```{r}
+state.abb # 50
+
+care_state |> 
+  distinct(state) |> 
+  pull(state) |>  # 56
+  setdiff(state.abb) # 6, "AS" "DC" "GU" "MP" "PR" "VI"
+```
+
+Census: https://www.census.gov/data/datasets/time-series/demo/popest/2020s-national-total.html
+
+dataset: https://www2.census.gov/programs-surveys/popest/datasets/2020-2024/state/totals/NST-EST2024-ALLDATA.csv
+
+```{r}
+pop <- read_csv("data/NST-EST2024-ALLDATA.csv") |> 
+  janitor::clean_names() |> 
+  mutate(state = as.numeric(state)) |> 
+  filter(between(state, 1, 56), state != 11) |> 
+  select(state_name = name, popestimate2023) |> 
+  mutate(
+    state = state.abb,
+    popestimate2023 = popestimate2023 / 1e6
+  )
+
+care_state_pop <- care_state |> 
+  inner_join(pop, by = "state")
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+care_state |> 
+  ggplot(aes(score, measure_id)) +
+  geom_boxplot(outliers = FALSE) +
+  geom_point(show.legend = FALSE) +
+  facet_wrap(vars(str_detect(measure_id, "^OP_18")), scales = "free_x")
+```
+
+```{r}
+care_state_pop |> 
+  ggplot(aes(popestimate2023, score)) +
+  geom_point(alpha = 1/5, show.legend = FALSE) +
+  geom_smooth(method = "lm") +
+  scale_x_log10() +
+  facet_wrap(vars(measure_id), scales = "free_y")
+
+library(ggrepel)
+
+p <- care_state_pop |> 
+  filter(measure_id == "OP_23") |> 
+  mutate(score = score / 100) |> 
+  ggplot(aes(popestimate2023, score)) +
+  geom_point(alpha = 1/5, show.legend = FALSE) +
+  geom_smooth(method = "loess", formula = y ~ x, se = FALSE) +
+  geom_text_repel(aes(label = state_name), size = 3) +
+  scale_x_log10() +
+  scale_y_continuous(labels = scales::percent_format(), limits = c(0.4, 0.8)) +
+  labs(x = "Population (millions in 2023, log scale)", 
+       y = "Percentage of patients",
+       title = "States with less than 4 million population have some difficulties\nto receive brain scan results within 45 minutes of arrival",
+       caption = "Note: Among patients who came to the emergency department\nwith stroke symptoms from April 2023 to March 2024\nSource: Centers for Medicare & Medicaid Services")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/timely_and_effective_care_by_us_state.png", p, width = 7, height = 5)
+```
