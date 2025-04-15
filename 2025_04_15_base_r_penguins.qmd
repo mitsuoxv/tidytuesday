@@ -1,0 +1,144 @@
+---
+title: "Base R Penguins"
+date: 2025-04-15
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+penguins <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-04-15/penguins.csv')
+penguins_raw <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-04-15/penguins_raw.csv') |> 
+  janitor::clean_names()
+```
+
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+glimpse(penguins)
+glimpse(penguins_raw)
+
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+skimr::skim(penguins)
+skimr::skim(penguins_raw)
+```
+
+individual_id is unique only in each study
+
+```{f}
+penguins_raw |> 
+  count(individual_id, sort = TRUE)
+
+penguins_raw |> 
+  filter(individual_id == "N13A2") |> View()
+
+penguins_raw |> 
+  count(study_name, sort = TRUE)
+
+penguins_raw |> 
+  count(study_name, island)
+
+penguins_raw |> 
+  count(study_name, individual_id, sort = TRUE)
+```
+
+Sample number is not unique even in island and study
+
+```{f}
+penguins_raw |> 
+  count(study_name, sample_number, sort = TRUE)
+
+penguins_raw |> 
+  filter(study_name == "PAL0708", sample_number == 1)
+
+penguins_raw |> 
+  count(island, study_name, sample_number, sort = TRUE) |> View()
+
+```
+
+```{r}
+penguins_raw |> 
+  count(study_name, date_egg, sort = TRUE)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+penguins_raw |> 
+  ggplot(aes(date_egg, study_name)) +
+  geom_point(position = position_jitter(width = 0, height = 0.5),
+             alpha = 1/4)
+
+range(penguins_raw |> filter(study_name == "PAL0708") |> pull(date_egg))
+range(penguins_raw |> filter(study_name == "PAL0809") |> pull(date_egg))
+range(penguins_raw |> filter(study_name == "PAL0910") |> pull(date_egg))
+
+p <- penguins_raw |> 
+  mutate(
+    species = str_extract(species, "(^\\S+)\\s", group = 1),
+    study_name = factor(study_name, labels = 2007:2009)
+  ) |> 
+  ggplot(aes(date_egg, island)) +
+  geom_point(aes(color = species, shape = species),
+    position = position_jitter(width = 0, height = 0.3),
+    alpha = 1/2) +
+  scale_color_manual(values = c("darkorange","purple","cyan4")) +
+  facet_wrap(vars(study_name), scale = "free_x") +
+  labs(x = "Date of egg", y = "Island",
+       color = "Penguin species", shape = "Penguin species",
+       title = "Chinstrap penguins in Dream Island tend to be born late",
+       caption = "Source: The R Datasets Package") +
+  theme(legend.position = "bottom",
+        panel.spacing.x = unit(5, "mm"))
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/base_r_penguins.png", p, width = 7, height = 5)
+```
