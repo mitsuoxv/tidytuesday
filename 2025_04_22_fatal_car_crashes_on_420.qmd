@@ -1,0 +1,131 @@
+---
+title: "Fatal Car Crashed on 4/20"
+date: 2025-04-22
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2025-04-22")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+daily_accidents <- tt$daily_accidents
+```
+
+```{r}
+range(daily_accidents$date)
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+June to September is dangerous.
+Old years were dangerous.
+
+```{r}
+#| label: Visualize
+
+daily_accidents |> 
+  mutate(
+    year = year(date),
+    mon_day = make_date(month = month(date), day = day(date))
+  ) |> 
+  ggplot(aes(mon_day, fatalities_count)) +
+  geom_line(aes(group = year), color = "gray30", alpha = 1/5,
+            show.legend = FALSE)
+
+p <- daily_accidents |> 
+  mutate(year_mon = make_date(year = year(date), month = month(date))) |> 
+  summarize(fatalities_count = mean(fatalities_count), .by = year_mon) |> 
+  mutate(
+    year = year(year_mon),
+    mon_day = make_date(month = month(year_mon))
+  ) |> 
+  mutate(july_count = fatalities_count[7], .by = year) |> 
+  mutate(
+    year_range = cut(year, breaks = c(1991, 1999, 2007, 2016),
+                     labels = c("1992-1999", "2000-2007", "2008-2016"))
+  ) |> 
+  ggplot(aes(mon_day, fatalities_count)) +
+  geom_line(aes(color = year, group = year), alpha = 1/2) +
+#  geom_text(aes(x = as.Date("1970-07-01"), y = july_count, label = year)) +
+  scale_x_date(date_labels = "%b", date_breaks = "3 month") +
+  facet_wrap(vars(year_range)) +
+  labs(x = NULL, y = "Fatalities counts\n(monthly average per day)",
+       color = "Year",
+       title = "Fatalities counts in car crashes are high in summer, and\nwere highest in 2000-2007",
+       caption = "Source: 420, original data/code at https://osf.io/qnrg6/") +
+  theme(plot.caption.position = "plot",
+        panel.grid.minor.x = element_blank(),
+        strip.background = element_rect(fill = "white", color = "gray50"),
+        strip.text = element_text(color = "black"))
+  
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/fatal_car_crashes_on_420.png", p, width = 7, height = 4)
+```
