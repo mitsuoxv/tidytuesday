@@ -1,0 +1,124 @@
+---
+title: "Seismic Events at Mount Vesuvius"
+date: 2025-05-13
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2025-05-13")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+vesuvius <- tt$vesuvius
+
+skimr::skim(vesuvius)
+```
+
+```{r}
+vesuvius |> 
+  count(area)
+
+vesuvius |> 
+  count(type)
+
+vesuvius |> 
+  count(review_level)
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+The Trump Administration initially followed Cruz List, but later added by itself.
+
+```{r}
+#| label: Visualize
+
+vesuvius |> 
+  ggplot(aes(year)) +
+  geom_bar()
+```
+
+```{r}
+range(vesuvius$depth_km, na.rm = TRUE)
+range(vesuvius$duration_magnitude_md, na.rm = TRUE)
+
+p <- vesuvius |> 
+  filter(!is.na(depth_km), !is.na(duration_magnitude_md),
+         duration_magnitude_md > 0) |> 
+  ggplot(aes(depth_km, abs(duration_magnitude_md))) +
+  geom_point(alpha = 1/10) +
+  geom_smooth() +
+  scale_x_log10() +
+  scale_y_log10() +
+  labs(x = "Depth in km (log scale)", y = "Md (log scale)\nexcluding microearthquakes",
+       title = "Earthquakes deeper than 0.1 km must have larger Md\nto be detected at Mount Vesuvius",
+       caption = "Source: Italian Istituto Nazionale di Geofisica e Vulcanologia (INGV)")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/seismic_events_at_mount_vesuvius.png", p, width = 7, height = 5)
+```
