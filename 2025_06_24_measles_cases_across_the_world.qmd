@@ -1,0 +1,124 @@
+---
+title: "Measles cases across the world"
+date: 2025-06-24
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2025-06-24")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+```{r}
+tt |> 
+  map(skimr::skim)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+cases_month <- tt$cases_month
+cases_year <- tt$cases_year
+
+```
+
+```{r}
+cases_year |> 
+  filter(region == "SEARO") |> 
+  distinct(country) |> View()
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+p <- cases_year |> 
+  mutate(
+    region = if_else(region == "WPRO", "SEARO", region),
+    region = factor(region, levels = c("AMRO", "SEARO", "EURO", "AFRO", "EMRO"),
+                    labels = c("Americas", "South East Asia and Oceania", "Europe and Eurasia", "Sub-Saharan Africa", "Middle East and North Africa"))
+  ) |> 
+  summarize(
+    total_population = sum(total_population),
+    measles_total = sum(measles_total),
+    .by = c(region, year)
+  ) |> 
+  filter(between(year, 2014, 2024)) |> 
+  mutate(measles_incidence_rate_per_1000000_total_population = measles_total / total_population * 1e6) |> 
+  ggplot(aes(year, measles_incidence_rate_per_1000000_total_population)) +
+  geom_col(aes(fill = region), show.legend = FALSE) +
+  facet_wrap(vars(region)) +
+  scale_y_continuous(expand = expansion(add = c(0, 10))) +
+  scale_x_continuous(breaks = c(2014, 2019, 2024)) +
+  labs(x = NULL, y = "Measles cases per 1 million population",
+       title = "Measles cases were low in 2020-21 under Covid-19, and\nthey have risen since then. Even Americas may not be safe\nunder anti-vaccine U.S. Secretary of Health and Human Services",
+       caption = "Source: World Health Organisation Provisional monthly measles and rubella data, as of June 2025")
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/measles_cases_across_the_world.png", p, width = 7, height = 4)
+```
