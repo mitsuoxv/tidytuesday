@@ -1,0 +1,170 @@
+---
+title: "MTA Permanent Art Catalog"
+date: 2025-07-22
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2025-07-22")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+mta_art <- tt$mta_art |> 
+  mutate(
+    station_name = case_when(
+      station_name == "Grand Central-42 Street" ~ "Grand Central-42 St",
+      station_name == "Fulton Center" ~ "Fulton St",
+      .default = station_name),
+    line = str_remove_all(line, " ")
+  )
+
+station_lines <- tt$station_lines
+```
+
+```{r}
+station_lines2 <- mta_art |> # 720
+  select(agency:line) |> 
+  filter(!is.na(line)) |> 
+  separate_longer_delim(line, delim = ",")
+
+station_lines # 720
+
+mta_art |> 
+  select(agency:line) |> 
+  filter(is.na(line))
+
+station_lines3 <- station_lines2 |> # 585
+  distinct(agency, station_name, line)
+```
+
+```{r}
+mta_art |> 
+  count(agency, station_name, sort = TRUE)
+
+station_lines |> 
+  count(agency, line, sort = TRUE)
+```
+
+```{r}
+mta_art |> 
+  filter(str_detect(line, "A")) |> View()
+
+station_lines3 |> 
+  count(agency, station_name, sort = TRUE)
+
+station_lines3 |> 
+  filter(station_name == "Canal St")
+
+mta_art |> 
+  filter(station_name == "Canal St") |> View()
+
+mta_art |> 
+  filter(str_detect(station_name, "Street")) |> View()
+
+station_lines3 |> 
+  filter(agency == "NYCT") |> 
+  distinct(line) |> View()
+```
+
+```{r}
+mta_art2 <- mta_art |> 
+  mutate(
+    n_lines = str_count(line, ",") + 1
+  )
+
+mta_art2 |> 
+  filter(n_lines >= 8) |> View()
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+range(mta_art2$art_date)
+
+p <- mta_art2 |> 
+  filter(!is.na(line)) |> 
+  mutate(art_date_cut = if_else(art_date > 2009, "2010-", "1980-2009")) |> 
+  ggplot(aes(n_lines)) +
+  geom_histogram(binwidth = 1) +
+  facet_wrap(vars(art_date_cut)) +
+  scale_y_continuous(expand = expansion(add = c(0, 10))) +
+  scale_x_continuous(expand = expansion(add = c(0, 0)),
+                     breaks = 1:11) +
+  labs(x = "# of lines going through the station where the art is displayed", y = "# of displayed arts",
+       title = "After the global financial crisis, arts are displayed\nmainly at one-line-only stations in NYC transit",
+       caption = "Source: MTA Permanent Art Catalog: Beginning 1980") +
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank())
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/mta_permanent_art_catalog.png", p, width = 6, height = 4)
+```
