@@ -162,7 +162,8 @@ p <- shows3 |>
   labs(x = "Report period", y = "Hours viewed (million)",
        title = "As seasons advance, hours viewed usually decline",
        subtitle = "Top 4 series in hours viewed, 2023 Jul-2025 Jun",
-       caption = "Note: # denotes seasons\nSource: Netflix Engagement Report")
+       caption = "Note: # denotes seasons\nSource: Netflix Engagement Report") +
+  theme(axis.text.x = element_text(size = 6))
 
 ```
 
