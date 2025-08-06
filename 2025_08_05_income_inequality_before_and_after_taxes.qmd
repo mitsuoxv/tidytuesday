@@ -1,0 +1,126 @@
+---
+title: "Income Inequality Before and After Taxes"
+date: 2025-08-06
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2025-08-05")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+income_inequality_processed <- tt$income_inequality_processed |> 
+  janitor::clean_names()
+
+income_inequality_raw <- tt$income_inequality_raw |> 
+  janitor::clean_names()
+
+```
+
+```{r}
+skimr::skim(income_inequality_processed)
+
+skimr::skim(income_inequality_raw)
+```
+
+```{r}
+code_owid_region <- income_inequality_raw |> 
+  filter(!is.na(owid_region)) |> 
+  distinct(code, owid_region)
+
+code_owid_region |> 
+  count(owid_region, sort = TRUE)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+p <- income_inequality_processed |> 
+  pivot_longer(gini_mi_eq:gini_dhi_eq) |> 
+  filter(!is.na(value)) |> 
+  left_join(code_owid_region, by = "code") |> 
+  filter(owid_region == "Europe") |> 
+  mutate(
+    name = factor(name, levels = c("gini_mi_eq", "gini_dhi_eq"),
+                  labels = c("Before tax", "After tax"))
+  ) |> 
+  ggplot(aes(year, value)) +
+  geom_point(aes(color = entity), alpha = 1/3) +
+  geom_line(aes(group = entity, color = entity), alpha = 1/3) +
+  facet_wrap(vars(name)) +
+  labs(x = NULL, y = "Gini coefficient",
+       color = "European countries",
+       title = "European countries manage to contain after-tax Gini coefficient under 0.4,\nwhile before-tax Gini coefficient tends to increase",
+       caption = "Source: Our World in Data") +
+  theme(plot.caption.position = "panel")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/income_inequality_before_and_after_taxes.png", p, width = 8, height = 5)
+```
