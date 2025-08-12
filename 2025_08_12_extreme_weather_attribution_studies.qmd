@@ -1,0 +1,125 @@
+---
+title: "Extreme Weather Attribution Studies"
+date: 2025-08-12
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2025-08-12")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+attribution_studies <- tt$attribution_studies
+attribution_studies_raw <- tt$attribution_studies_raw
+```
+
+```{r}
+skimr::skim(attribution_studies)
+skimr::skim(attribution_studies_raw)
+
+```
+
+```{r}
+attribution_studies |> 
+  count(event_type, sort = TRUE)
+
+attribution_studies |> 
+  count(classification, sort = TRUE)
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+p <- attribution_studies |> 
+#  filter(publication_year > 2010) |> 
+  mutate(
+    classification = fct_relevel(classification, "No discernible human influence"),
+    event_type = event_type |> 
+      fct_lump_n(n = 5) |> 
+      fct_infreq()
+  ) |> 
+  filter(event_type != "Other") |> 
+  ggplot(aes(publication_year)) +
+  geom_bar(aes(fill = classification)) +
+  scale_x_continuous(breaks = c(2010, 2020)) +
+  scale_y_continuous(expand = expansion(add = c(0, 2))) +
+  facet_wrap(vars(event_type)) +
+  guides(fill = guide_legend(nrow = 2, reverse = TRUE)) +
+  labs(x = "Year when studies were published", y = "# of studies",
+       fill = "Climate change\nimpact",
+       title = "Climate change makes heat, rain, flooding, drought, and storm more severe,\nwhile it makes cold, snow, and ice less severe, studies show",
+       caption = "Source; Carbon Brief") +
+  theme(legend.position = "top",
+        panel.grid.minor.y = element_blank())
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/extreme_weather_attribution_studies.png", p, width = 8, height = 6)
+```
