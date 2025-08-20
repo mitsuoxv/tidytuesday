@@ -1,0 +1,133 @@
+---
+title: "Scottish Munros"
+date: 2025-08-19
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2025-08-19")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+scottish_munros <- tt$scottish_munros
+```
+
+```{r}
+skimr::skim(scottish_munros)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+library(sf)
+
+uk <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf") |> 
+  select(name, continent, geometry) |> 
+  filter(name == "United Kingdom")
+
+uk
+
+st_crs("EPSG:4326")
+st_crs("EPSG:27700")
+
+scottish_munros_sf <- scottish_munros |> 
+  filter(!is.na(xcoord)) |> 
+  st_as_sf(coords = c("xcoord", "ycoord"), crs = "EPSG:27700")
+
+st_transform(scottish_munros_sf, "EPSG:4326")
+
+ggplot() +  
+  geom_sf(data = uk) +
+  geom_sf(data = st_transform(scottish_munros_sf, "EPSG:4326"))
+
+scotland <- rnaturalearth::ne_countries(scale = "large", 
+                            type = "map_units",
+                            returnclass = "sf") |> 
+  filter(name == "Scotland")
+
+scottish_munros_sf2 <- scottish_munros_sf |> 
+  filter(`2021` == "Munro")
+
+p <- ggplot() +  
+  geom_sf(fill = "white", data = scotland) +
+  geom_sf(aes(color = Height_m), size = 1, shape = 2,
+          data = st_transform(scottish_munros_sf2, "EPSG:4326")) +
+  scale_color_gradient(low = "gray90", high = "brown") +
+  coord_sf(xlim = c(-8, -2), ylim = c(56, 59)) +
+  labs(color = "Height (m)",
+       title = "Munros locate on 2 or 3 lines in Scotland",
+       subtitle = "Triangles denote munros in 2021",
+       caption = "Source: Database of British and Irish hills") +
+  theme(panel.background = element_rect(fill = "steelblue"))
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/scottish_munros.png", p, width = 5, height = 4)
+```
