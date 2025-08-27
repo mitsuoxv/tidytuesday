@@ -1,0 +1,180 @@
+---
+title: "Billboard Hot 100 Number Ones"
+date: 2025-08-26
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2025-08-26")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+billboard <- tt$billboard
+topics <- tt$topics
+
+```
+
+```{r}
+skimr::skim(billboard)
+
+skimr::skim(topics)
+```
+
+```{r}
+billboard |> 
+  separate_longer_delim(producers, ";") |> 
+  count(producers, sort = TRUE) |> View()
+
+billboard |> 
+  separate_longer_delim(producers, ";") |> 
+  count(producers, wt = weeks_at_number_one, sort = TRUE) |> View()
+
+billboard |> 
+  separate_longer_delim(songwriters, ";") |> 
+  count(songwriters, wt = weeks_at_number_one, sort = TRUE) |> View()
+
+billboard |> 
+  separate_longer_delim(songwriters_w_o_interpolation_sample_credits, ";") |> 
+  count(songwriters_w_o_interpolation_sample_credits, wt = weeks_at_number_one, sort = TRUE) |> View()
+
+```
+
+```{r}
+billboard |> 
+  separate_longer_delim(producers, ";") |> 
+  summarize(
+    n = n(),
+    weeks_at_number_one = sum(weeks_at_number_one),
+    n_artist = n_distinct(artist),
+    first_appearance = year(min(date)),
+    .by = producers
+  ) |> 
+  arrange(desc(weeks_at_number_one)) |> View()
+
+billboard |> 
+  separate_longer_delim(producers, ";") |> 
+  filter(producers == "George Martin") |> View()
+
+billboard |> 
+  separate_longer_delim(producers, ";") |> 
+  filter(producers == "Max Martin") |> View()
+
+billboard |> 
+  separate_longer_delim(producers, ";") |> 
+  filter(producers == "David Foster") |> View()
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+billboard |> 
+  separate_longer_delim(producers, ";") |> 
+  summarize(
+    n = n(),
+    weeks_at_number_one = sum(weeks_at_number_one),
+    n_artist = n_distinct(artist),
+    first_appearance = year(min(date)),
+    .by = producers
+  ) |> 
+  filter(n_artist > 3) |> 
+  ggplot(aes(n_artist, weeks_at_number_one)) +
+  geom_point(aes(color = first_appearance)) +
+  scale_color_viridis_c()
+```
+
+```{r}
+billboard |> 
+  count(artist, sort = TRUE)
+
+p <- billboard |>
+  mutate(
+    artist = artist |> 
+      fct_lump_min(10) |> 
+      fct_infreq() |> 
+      fct_rev(),
+    decade = paste0(year(date) %/% 10 * 10, "s")
+  ) |> 
+  filter(artist != "Other") |> 
+  ggplot(aes(artist)) +
+  geom_bar(aes(fill = decade), position = position_stack(reverse = TRUE)) +
+  coord_flip() +
+  scale_fill_brewer(palette = "OrRd") +
+  scale_y_continuous(expand = expansion(add = c(0, 2))) +
+  labs(y = "# of Number One Songs", x = NULL,
+       fill = "First decade\nto hit Number One",
+       title = "Taylor Swift is the diva, now",
+       caption = "Source: Billboard Hot 100 Number Ones") +
+  theme(plot.caption.position = "plot")
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/billboard_hot_100_number_ones.png", p, width = 6, height = 4)
+```
