@@ -1,0 +1,135 @@
+---
+title: "WHO TB Burden Data: Incidence, Mortality, and Population"
+date: 2025-11-11
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2025-11-11")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+who_tb_data <- tt$who_tb_data
+```
+
+```{r}
+skimr::skim(who_tb_data)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+draw_line_chart_by_region <- function(x) {
+  who_tb_data |> 
+    ggplot(aes(year, {{ x }})) +
+    geom_line(aes(group = country)) +
+    facet_wrap(vars(g_whoregion))
+}
+
+draw_line_chart_by_region(c_cdr)
+draw_line_chart_by_region(c_newinc_100k)
+draw_line_chart_by_region(cfr)
+draw_line_chart_by_region(e_inc_100k)
+draw_line_chart_by_region(e_mort_100k)
+draw_line_chart_by_region(e_mort_exc_tbhiv_100k)
+draw_line_chart_by_region(e_mort_tbhiv_100k)
+
+```
+
+```{r}
+
+countries_e_pop_num_1e8 <- who_tb_data |> 
+  filter(e_pop_num > 1e8) |> 
+  distinct(country) |> 
+  pull(country)
+
+who_tb_data_countries_e_pop_num_1e8 <- who_tb_data |>
+  filter(country %in% countries_e_pop_num_1e8)
+
+library(ggrepel)
+
+p <- who_tb_data_countries_e_pop_num_1e8 |> 
+  ggplot(aes(year, e_inc_100k)) +
+  geom_line(aes(group = country, color = country),
+            show.legend = FALSE) +
+  geom_text_repel(aes(label = str_wrap(country, 20), color = country),
+                  size = 3, show.legend = FALSE,
+            data = who_tb_data_countries_e_pop_num_1e8 |> 
+              filter(year == 2018)) +
+  facet_wrap(vars(g_whoregion)) +
+  labs(x = NULL, y = "Estimated incidence (all forms) per 100K population",
+       title = "Tuberculosis incidence stopped decreasing, and even rebounded\nin the Pillippines, Indonesia, etc.",
+       subtitle = "Countries with more than 100 million population",
+       caption = "Source: getTBinR package") +
+  theme(panel.grid.minor = element_blank())
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/who_tb_burden_data_incidence_mortality_and_population.png", p, width = 7, height = 6)
+```
