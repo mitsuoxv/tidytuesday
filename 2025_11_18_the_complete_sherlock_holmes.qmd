@@ -1,0 +1,189 @@
+---
+title: "The Complete Sherlock Holmes"
+date: 2025-11-18
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2025-11-18")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+holmes <- tt$holmes
+```
+
+```{r}
+skimr::skim(holmes)
+
+books <- holmes |> 
+  distinct(book) |> 
+  pull(book)
+
+memoirs <- books[15:25]
+
+holmes |> 
+  filter(book %in% memoirs) |> 
+  count(book, sort = TRUE)
+
+holmes |> 
+  filter(book == "The \"Gloria Scott\"") |> View() # from 42 Holmes speaks
+
+holmes |> 
+  filter(book == "The Musgrave Ritual") |> View() # from 104 Holmes speaks
+
+holmes |> 
+  filter(book == "The Final Problem") |> View()
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+memoirs_works <- holmes |> 
+  filter(book %in% memoirs)
+
+lines_per_paragraph_in_memoirs <- memoirs_works |> 
+  filter(is.na(text)) |> 
+  group_by(book) |> 
+  mutate(n_lines = line_num - lag(line_num)) |> 
+  filter(!is.na(n_lines)) |> 
+  mutate(paragraph_num = row_number()) |>
+  ungroup()
+
+lines_per_paragraph_in_memoirs |> 
+  ggplot(aes(paragraph_num, n_lines)) +
+  geom_col() +
+  facet_wrap(vars(book), scale = "free_x")
+
+lines_per_paragraph_in_memoirs |> 
+  ggplot(aes(n_lines)) +
+  geom_histogram() +
+  facet_wrap(vars(book), scale = "free_y")
+
+```
+
+```{r}
+library(tidytext)
+
+memoirs_words <- memoirs_works |> 
+  mutate(
+    writer = if_else((book == "The \"Gloria Scott\"" & line_num >= 42) |
+                     (book == "The Musgrave Ritual" & line_num >= 104),
+                     "Holmes", "Watson")
+  ) |> 
+  filter(!is.na(text)) |> 
+  unnest_tokens(word, text) |> 
+  count(writer, word, sort = TRUE)
+
+memoirs_words_tf_idf <- memoirs_words |> 
+  bind_tf_idf(word, writer, n) |> 
+  arrange(desc(tf_idf))
+
+memoirs_words_tf_idf |> 
+  filter(idf < log(2), writer == "Holmes") 
+  
+memoirs_words_tf_idf |> 
+  filter(word == "the")
+
+memoirs_words_tf_idf |> 
+  filter(word == "i")
+
+memoirs_words_tf_idf |> 
+  filter(word == "and")
+
+memoirs_words_tf_idf |> 
+  filter(word == "of")
+
+p <- memoirs_words_tf_idf |> 
+  filter(idf < log(2)) |> 
+  arrange(word, writer) |> 
+  mutate(
+    tf_diff = tf - lag(tf),
+    tf_mult = lag(tf) / tf,
+    .by = word
+  ) |> 
+  filter(writer == "Watson") |> 
+  arrange(tf_mult) |> 
+  filter(tf > 0.01) |> 
+  mutate(word = fct_reorder(word, tf_mult)) |> 
+  ggplot(aes(tf_mult, word)) +
+  geom_linerange(aes(xmin = 1, xmax = tf_mult)) +
+  geom_point() +
+  geom_vline(xintercept = 1, color = "gray70") +
+  labs(x = "Term frequency ratio, Holmes over Watson",
+       y = "More than 1/100 term frequency words\nin Watson writings",
+       title = "Holmes uses more 'and' and less 'you' than Watson\nin 11 works in The Memoirs of Sherlock Holmes",
+       subtitle = "Holmes speaks in The \"Gloria Scott\" and The Musgrave Ritual,\nand Watson writes the rest",
+       caption = "Source: The Complete Sherlock Holmes via {sherlock} R Package")
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/the_complete_sherlock_holmes.png", p, width = 6, height = 4)
+```
