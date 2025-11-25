@@ -116,7 +116,7 @@ p <- spi_indicators_long |>
   geom_boxplot() +
   facet_wrap(vars(name), nrow = 1) +
   labs(x = "Income level of country", y = "Score",
-       title = "Statistical Performance Indicators score varys much in 'Data Sources',\nand little in 'Data roducts' by income level of country in 2023",
+       title = "Statistical Performance Indicators score varys much in 'Data Sources',\nand little in 'Data Products' by income level of country in 2023",
        subtitle = "# in parentheses denotes number of countries",
        caption = "Source: World Bank Statistical Performance Indicators") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
