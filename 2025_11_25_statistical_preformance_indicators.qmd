@@ -1,0 +1,134 @@
+---
+title: "Statisctical Performance Indicators"
+date: 2025-11-25
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2025-11-25")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+spi_indicators <- tt$spi_indicators
+```
+
+```{r}
+skimr::skim(spi_indicators)
+```
+
+```{r}
+spi_indicators |> 
+  count(year)
+
+spi_indicators |> 
+  summarize(across(ends_with("_score"), \(x) sum(!is.na(x))), .by = year) |> View()
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+spi_indicators_long <- spi_indicators |> 
+  filter(year == 2023, !is.na(overall_score), income != "Not classified") |> 
+  mutate(n = n(), .by = income) |> 
+  mutate(
+    income = str_remove(income, " income$"),
+    income = str_glue("{income} ({n})"),
+    income = fct_inorder(income)
+  ) |> 
+  pivot_longer(ends_with("_score")) |> 
+  mutate(
+    name = name |> 
+      str_remove("_score$") |> 
+      str_replace("_", "\n") |> 
+      str_to_title() |> 
+      fct_inorder()
+  )
+
+spi_indicators_long |> 
+  ggplot(aes(population, value)) +
+  geom_point(alpha = 1/5) +
+  geom_smooth(method = "lm") +
+  scale_x_log10() +
+  facet_wrap(vars(name))
+
+p <- spi_indicators_long |> 
+  ggplot(aes(income, value)) +
+  geom_boxplot() +
+  facet_wrap(vars(name), nrow = 1) +
+  labs(x = "Income level of country", y = "Score",
+       title = "Statistical Performance Indicators score varys much in 'Data Sources',\nand little in 'Data roducts' by income level of country in 2023",
+       subtitle = "# in parentheses denotes number of countries",
+       caption = "Source: World Bank Statistical Performance Indicators") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/statistical_performance_indicators.png", p, width = 8, height = 4)
+```
