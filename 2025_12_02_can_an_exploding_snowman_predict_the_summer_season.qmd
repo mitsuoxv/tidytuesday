@@ -1,0 +1,120 @@
+---
+title: "Can an exploding snowman predict the summer season?"
+date: 2025-12-02
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2025-12-02")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+sechselaeuten <- tt$sechselaeuten
+```
+
+```{r}
+skimr::skim(sechselaeuten)
+
+sechselaeuten |> 
+  filter(is.na(duration))
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+sechselaeuten_std <- sechselaeuten |> 
+  filter(between(year, 1952, 2019)) |> 
+  mutate(across(duration:rre150m0, \(x) (x - mean(x))/sd(x)))
+
+sechselaeuten_std |> 
+  pivot_longer(duration:rre150m0) |> 
+  ggplot(aes(year, value)) +
+  geom_line(aes(color = name)) +
+  geom_point(aes(color = name))
+
+p <- sechselaeuten_std |> 
+  pivot_longer(tre200m0:rre150m0) |> 
+  mutate(
+    name = name |> 
+      factor(levels = c("tre200m0", "tre200mn", "tre200mx", "sre000m0", "sremaxmv", "rre150m0"),
+                  labels = c("Average air temperature 2 m above ground", "Minimum air temperature 2 m above ground", "Maximum air temperature 2 m above ground", "Total sunshine duration", "Total sunshine duration as a percentage of the possible maximum", "Total precipitation")) |> 
+      str_wrap(width = 30)
+  ) |> 
+  ggplot(aes(duration, value)) +
+  geom_point(alpha = 1/4) +
+  geom_smooth(method = "lm") +
+  facet_wrap(vars(name)) +
+  labs(x = "Standardized value of time elapsed from ignition of Boeoeg effigy until explosion", y = "Standardized value",
+       title = "The Boeoegg apparently can't predict either temperature,\nprecipitation, or sunsine duration in the summer in Zurich",
+       caption = "Note: Years from 1952 to 2019\nSource: OpenData for Zurich's Sechselaeuten")
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/can_an_exploding_snowman_predict_the_summer_season.png", p, width = 7, height = 6)
+```
