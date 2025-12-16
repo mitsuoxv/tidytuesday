@@ -1,0 +1,208 @@
+---
+title: "Roundabouts across the world"
+date: 2025-12-16
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2025-12-16")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+roundabouts_clean <- tt$roundabouts_clean
+```
+
+```{r}
+skimr::skim(roundabouts_clean)
+```
+
+```{r}
+roundabouts_clean |> 
+  count(country, sort = TRUE)
+
+roundabouts_clean |> 
+  filter(country == "Japan") |> View()
+
+roundabouts_clean |> 
+  count(approaches, sort = TRUE)
+
+roundabouts_clean |> 
+  filter(approaches == 1) |> View()
+
+roundabouts_clean |> 
+  count(lane_type, sort = TRUE)
+
+roundabouts_clean |> 
+  filter(lane_type == "Ring junction (3+ mini-roundabouts in ring)") |> View()
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+library("cartographr")
+
+# 出力用紙サイズを設定する:set_output_sizeコマンド
+# サイズを指定:sizeオプション;"A0","A1","A2","A3","A4","A5","A6",
+# "small_poster","medium_poster","large_poster",c(280,280)などと指定
+# set_output_size(c(280,280)) 
+set_output_size("A6")
+
+roundabouts_in_japan <- roundabouts_clean |> 
+  filter(country == "Japan") |> 
+  mutate(address = str_remove(address, " \\(Japan\\)")) |> 
+  unite(name, name:address, sep = ", ") |> 
+  mutate(
+    name = name |> 
+      str_remove("\\(unknown\\), ") |> 
+      str_wrap(width = 30)
+  )
+
+roundabouts_in_japan |> 
+  count(county_area, sort = TRUE)
+
+roundabouts_in_japan |> 
+  count(state_region, sort = TRUE)
+
+# OpenStreetMapからデータを取得:get_osmdataコマンド
+# 中心の緯度を指定:latオプション
+# 中心の経度を指定:lonオプション
+# 取得領域幅の指定:x_distanceオプション;距離はメートル
+# 取得領域高さの指定:y_distanceオプション;省略で幅と用紙サイズの縦横比に基づく
+# 縦横比の指定:aspect_ratioオプション
+# 処理メッセージの表示/非表示:quietオプション;TRUE/FALSE
+# 取得したデータを保持する:keepオプション;TRUE/FALSE
+roundabouts_maps <- roundabouts_in_japan |> 
+  mutate(
+    maps = map2(long, lat, \(long, lat) get_osmdata(lat = long, lon = lat, x_distance = 50, aspect_ratio = 1, quiet = FALSE, keep = FALSE))
+  )
+
+length(roundabouts_maps)
+
+roundabouts_maps[[18]][[3]]
+plot_map(roundabouts_maps[[18]][[3]], palette = "tropical")
+
+# 取得データをプロット:plot_mapコマンド
+# データを指定:osmオプション
+# パレットを適応:paletteオプション
+# "alphabet","arctic","autumn","autumn-muted","bw","desert","evening",
+# "gray","iberia","imhof","lines","metropolitan","midnight","minimal",
+# "swiss", "tropical"が設定可能
+plots <- vector("list", length = nrow(roundabouts_in_japan))
+
+draw_each_roundabout <- function(i) {
+  plot_map(roundabouts_maps[[18]][[i]], palette = "tropical") +
+  geom_text(aes(x = lat, y = long, label = name),
+            data = roundabouts_in_japan |> slice(i),
+            hjust = 0.5, vjust = 0.5, color = "black")
+}
+
+draw_each_roundabout(1)
+draw_each_roundabout(2)
+draw_each_roundabout(3) # error
+draw_each_roundabout(4)
+draw_each_roundabout(5)
+draw_each_roundabout(6)
+draw_each_roundabout(7)
+draw_each_roundabout(8)
+
+plots <- map(c(1:2, 4:30), draw_each_roundabout)
+
+library(patchwork)
+
+rows_app_gt_4 <- roundabouts_in_japan |> 
+  mutate(row = row_number()) |> 
+  filter(approaches > 4) |> 
+  pull(row)
+
+plots[[1]]
+plots[[6]]
+plots[[5]]
+
+plots_pc <- plots[[1]]
+
+for (i in rows_app_gt_4[2:5] - 1) {
+  plots_pc <- plots_pc + plots[[i]]
+}
+
+p <- plots_pc +
+  plot_layout(ncol = 3) +
+  plot_annotation(
+    title = "There are only 5 roundabouts with more than 4 approaches in Japan",
+    subtitle = "Sakuragaoka, Tama City roundabout is the only one I personally have watched",
+    caption = "Source: roundabouts R package",
+    theme = theme(
+      plot.title.position = "plot",
+      plot.caption.position = "plot"
+      )
+  )
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/roundabouts_across_the_world.png", p, width = 4, height = 3)
+```
