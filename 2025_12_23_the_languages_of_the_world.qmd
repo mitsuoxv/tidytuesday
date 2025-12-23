@@ -1,0 +1,127 @@
+---
+title: "The Languages of the World"
+date: 2025-12-23
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2025-12-23")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+endangered_status <- tt$endangered_status
+families <- tt$families
+languages <- tt$languages
+```
+
+```{r}
+skimr::skim(endangered_status)
+skimr::skim(families)
+skimr::skim(languages)
+```
+
+```{r}
+languages |> 
+  count(macroarea, sort = TRUE)
+
+status_labels <- endangered_status |> 
+  count(status_code, status_label) |> 
+  pull(status_label)
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+p <- languages |> 
+  filter(!is.na(macroarea)) |> 
+  mutate(n_macroarea = n(), .by = macroarea) |> 
+  filter(n_macroarea > 300) |> 
+  mutate(
+    macroarea = str_glue("{macroarea}\n({n_macroarea})"),
+    macroarea = fct_infreq(macroarea)
+  ) |> 
+  left_join(endangered_status, by = "id") |> 
+  mutate(status_label = factor(status_label, levels = status_labels)) |> 
+  ggplot(aes(status_label)) +
+  geom_bar(aes(fill = status_label != "extinct"), show.legend = FALSE) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+  facet_wrap(vars(macroarea), nrow = 1) +
+  labs(x = "Endangerment category", y = "# of languages",
+       title = "In the new world, a lot of languages became extinct",
+       subtitle = "# in the parentheses in macro area denotes # of languages",
+       caption = "Source: Glottolog_5.2") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+        panel.grid.major.x = element_blank(),
+        strip.text = element_text(size = 7))
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/the_languages_of_the_world.png", p, width = 6, height = 4)
+```
