@@ -1,0 +1,176 @@
+---
+title: "Christmas Novels"
+date: 2025-12-30
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2025-12-30")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+christmas_novel_authors <- tt$christmas_novel_authors
+christmas_novel_text <- tt$christmas_novel_text
+christmas_novels <- tt$christmas_novels
+```
+
+```{r}
+christmas_novels |> 
+  count(gutenberg_author_id, sort = TRUE)
+
+christmas_novels |> 
+  count(gutenberg_id, sort = TRUE)
+
+christmas_novels |> 
+  filter(gutenberg_id == "17743")
+
+christmas_novels |> 
+  filter(gutenberg_id == "42919")
+
+christmas_novel_authors |> 
+  filter(gutenberg_author_id == "3522")
+
+christmas_novel_authors |> 
+  filter(gutenberg_author_id == "3796")
+
+christmas_novels |> 
+  filter(gutenberg_author_id == "3522")
+
+christmas_novels |> 
+  filter(gutenberg_author_id == "3796")
+
+# drop 3796
+christmas_novels2 <- christmas_novels |> 
+  distinct(gutenberg_id, .keep_all = TRUE)
+
+christmas_novel_text2 <- christmas_novel_text |> 
+  left_join(christmas_novels2, by = "gutenberg_id") |> 
+  left_join(christmas_novel_authors, by = "gutenberg_author_id")
+
+christmas_novel_text2 |> 
+  count(gutenberg_author_id, author, sort = TRUE)
+
+christmas_novel_text2 |> 
+  count(birthdate > 1850)
+
+```
+
+```{r}
+library(tidytext)
+
+birthdate_1850_words <- christmas_novel_text2 |> 
+  filter(!is.na(birthdate)) |> 
+  unnest_tokens(word, text) |> 
+  count(birthdate > 1850, word)
+
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+christmas_novel_text2 |> 
+  ggplot(aes(birthdate)) +
+  geom_bar()
+
+```
+
+```{r}
+
+birthdate_1850_tf_diff <- 
+  birthdate_1850_words |> 
+  filter(!is.na(word)) |> 
+  anti_join(stop_words, by = "word") |> 
+  bind_tf_idf(word, `birthdate > 1850`, n) |> 
+  arrange(`birthdate > 1850`) |> 
+  summarize(
+    tf_old = tf[1] * 1000,
+    tf_new = tf[2] * 1000,
+    diff_tf = tf_new - tf_old,
+    .by = word
+  ) |> 
+  arrange(desc(abs(diff_tf))) |> 
+  filter(abs(diff_tf) > 1)
+
+p <- birthdate_1850_tf_diff |> 
+  mutate(word = fct_reorder(word, diff_tf)) |> 
+  ggplot(aes(tf_old, word)) +
+  geom_segment(aes(xend = tf_new), arrow = arrow(length = unit(2, "mm"))) +
+  scale_x_continuous(expand = expansion(mult = c(0.01, 0.05))) +
+  labs(x = "Term frequency per 1000 words.\nStart is Christmas novels by authors whose birthdate is before 1850,\nand end is those after 1850",
+       y = NULL,
+       title = "Authors born after 1850 tend to write 'Christmas' more often",
+       subtitle = "Words whose term frequency changed by more than 1/1000",
+       caption = "Source; Project Gutenberg")
+  
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/christmas_novels.png", p, width = 7, height = 5)
+```
