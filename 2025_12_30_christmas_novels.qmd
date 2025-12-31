@@ -165,6 +165,24 @@ p <- birthdate_1850_tf_diff |>
   
 ```
 
+```{r}
+
+birthdate_1850_words |> 
+  filter(!is.na(word)) |> 
+  anti_join(stop_words, by = "word") |> 
+  bind_tf_idf(word, `birthdate > 1850`, n) |> 
+  arrange(word) |> 
+  mutate(`birthdate > 1850` = if_else(`birthdate > 1850`, "tf_new", "tf_old")) |> 
+  pivot_wider(id_cols = word, names_from = `birthdate > 1850`, values_from = tf, values_fill = 0) |> 
+  mutate(
+    tf_new = tf_new * 1000,
+    tf_old = tf_old * 1000,
+    diff_tf = tf_new - tf_old
+  ) |> 
+  arrange(desc(abs(diff_tf))) |> 
+  filter(abs(diff_tf) > 1) |> View()
+```
+
 # Save Image
 
 Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
