@@ -1,0 +1,171 @@
+---
+title: "Brazilian Companies"
+date: 2026-01-27
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2026-01-27")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+companies <- tt$companies
+
+skimr::skim(companies)
+
+# id is unique
+companies |> 
+  count(company_id, sort = TRUE)
+
+# same name plentiful
+companies |> 
+  count(company_name, sort = TRUE)
+
+companies |> 
+  count(legal_nature, sort = TRUE)
+
+companies |> 
+  count(owner_qualification, sort = TRUE)
+
+companies |> 
+  count(company_size, sort = TRUE)
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+companies |> 
+  ggplot(aes(capital_stock)) +
+  geom_histogram() +
+  scale_x_log10() +
+  facet_wrap(vars(company_size), ncol = 1, scale = "free_y")
+```
+
+```{r}
+companies |> 
+  filter(capital_stock > 1e10) |> 
+  ggplot(aes(capital_stock)) +
+  geom_histogram() +
+  scale_x_log10() +
+  facet_wrap(vars(owner_qualification))
+```
+
+```{r}
+companies |> 
+  filter(capital_stock > 1e10) |> 
+  ggplot(aes(capital_stock)) +
+  geom_histogram() +
+  scale_x_log10() +
+  facet_wrap(vars(legal_nature))
+
+```
+
+
+```{r}
+p <- companies |> 
+  mutate(
+    top_tail = if_else(capital_stock > 1e10, "capital\n> 1e10", "capital\n<= 1e10"),
+    company_size = factor(
+      company_size,
+      levels = c("micro-enterprise", "small-enterprise", "other"),
+      labels = c("Micro enterprise", "Small enterprise", "Other")
+    )
+  ) |> 
+  ggplot(aes(capital_stock)) +
+  geom_histogram(aes(fill = capital_stock == 1e11), show.legend = FALSE) +
+  geom_vline(xintercept = 1e10, color = "gray50", linetype = "dotted") +
+  scale_x_log10(breaks = c(1e5, 1e7, 1e9, 1e11)) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05)),
+                     labels = scales::comma_format()) +
+  scale_fill_manual(values = c("gray50", "red")) +
+  facet_grid(vars(top_tail), vars(company_size),
+             scale = "free_y") +
+  labs(x = "Declared share capital (BRL)",
+       y = "Enterprise counts",
+       title = "There is a spike in enterprise counts at 100 billion BRL\ndeclared share capital, especiall in small enterprises in Brazil",
+       caption = "Source: Open data CNPJ - December 2025")
+
+companies |> 
+  filter(capital_stock == 1e11) |> 
+  count(legal_nature, sort = TRUE)
+
+companies |> 
+  filter(capital_stock == 1e11) |> 
+  count(company_size, sort = TRUE)
+
+companies |> 
+  filter(capital_stock == 1e11) |> 
+  count(owner_qualification, sort = TRUE)
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/brazilian_companies.png", p, width = 7, height = 4)
+```
