@@ -1,0 +1,159 @@
+---
+title: "Science Foundation Ireland Grants Commitments"
+date: 2026-02-24
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2026-02-24")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+sfi_grants <- tt$sfi_grants
+
+skimr::skim(sfi_grants)
+
+sfi_grants |> 
+  count(research_body, sort = TRUE)
+
+sfi_grants |> 
+  count(research_body_ror_id, sort = TRUE)
+
+sfi_grants |> 
+  count(research_body, wt = current_total_commitment, sort = TRUE)
+
+```
+
+Negative grants?
+
+```{r}
+sfi_grants |> 
+  filter(current_total_commitment < 0) |> View()
+
+sfi_grants |> 
+  filter(research_body == "Department of Agriculture, Food and the Marine (DAFM)")
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+sfi_grants |> 
+  mutate(start_year = year(start_date)) |> 
+  summarize(grants = sum(current_total_commitment),
+            .by = c(start_year, research_body)) |> 
+  mutate(
+    research_body = research_body |> 
+      fct_lump_n(n = 10)
+  ) |> 
+  ggplot(aes(start_year, grants)) +
+  geom_col(aes(fill = research_body), show.legend = TRUE)
+```
+
+```{r}
+
+sfi_grants2 <- sfi_grants |> 
+  mutate(
+    period = end_date - start_date,
+    period_years = as.numeric(period) / 365
+  ) |> 
+  filter(current_total_commitment > 0)
+
+sfi_grants2 |> 
+  ggplot(aes(period_years)) +
+  geom_histogram(binwidth = 0.1)
+
+sfi_grants2 |> 
+  ggplot(aes(current_total_commitment)) +
+  geom_histogram(bins = 100) +
+  scale_x_log10()
+
+sfi_grants2 |> 
+  ggplot(aes(period_years, current_total_commitment)) +
+  geom_point(alpha = 1/10) +
+  scale_y_log10(labels = scales::comma_format()) +
+  scale_x_continuous(breaks = 0:10)
+
+p <- sfi_grants2 |> 
+  filter(period_years > 0, period_years < 6) |> 
+  mutate(period_years_cut = cut(period_years, 0:10)) |> 
+  ggplot(aes(current_total_commitment)) +
+  geom_histogram(bins = 100) +
+  scale_x_log10(labels = scales::label_comma(scale = 1e-3)) +
+  facet_wrap(vars(period_years_cut), 
+             ncol = 1, strip.position = "right") +
+  labs(x = "Grants from Science Foundation Ireland\n(thousand euros, log scale)", y = "Number of projects",
+       title = "Longer STEM project tends to get more grants, whose distribution\nshows a few peak values in each length category",
+       subtitle = "Right strip denotes project length in years",
+       caption = "Source: Science Foundation Ireland Historical Grants Commitments")
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/science_foundation_ireland_grants_commitments.png", p, width = 7, height = 5)
+```
