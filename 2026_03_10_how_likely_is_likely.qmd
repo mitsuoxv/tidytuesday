@@ -1,0 +1,211 @@
+---
+title: "How likely is 'likely'?"
+date: 2026-03-10
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2026-03-10")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+absolute_judgements <- tt$absolute_judgements
+pairwise_comparisons <- tt$pairwise_comparisons
+respondent_metadata <- tt$respondent_metadata
+```
+
+```{r}
+skimr::skim(absolute_judgements)
+
+absolute_judgements |> 
+  count(response_id, sort = TRUE)
+
+nrow(absolute_judgements)
+19 * 5174 # 5174 respondents answer 19 times each
+
+skimr::skim(pairwise_comparisons)
+
+pairwise_comparisons |> 
+  count(response_id, sort = TRUE)
+
+pairwise_comparisons |> 
+  count(pair_id, sort = TRUE)
+
+pairwise_comparisons |> 
+  count(pair_id, term1, term2, sort = TRUE)
+
+# pair_id does not define two comparison terms
+pairwise_comparisons |> 
+  filter(pair_id == 1) |> View()
+
+nrow(pairwise_comparisons)
+10 * 5174 # 5174 respondents answer 10 times each
+
+skimr::skim(respondent_metadata)
+
+respondent_metadata |> 
+  count(timestamp)
+
+respondent_metadata |> 
+  count(age_band)
+
+respondent_metadata |> 
+  count(english_background)
+
+respondent_metadata |> 
+  count(education_level)
+
+respondent_metadata |> 
+  count(country_of_residence, sort = TRUE)
+
+```
+
+```{r}
+
+consistency_check <- pairwise_comparisons |> 
+  left_join(absolute_judgements |> rename(term1 = term, probability1 = probability, order1 = order),
+            by = c("response_id", "term1")) |> 
+  left_join(absolute_judgements |> rename(term2 = term, probability2 = probability, order2 = order),
+            by = c("response_id", "term2")) |> 
+  left_join(absolute_judgements |> rename(selected = term, probability_selected = probability, order_selected = order),
+            by = c("response_id", "selected")) |> 
+  mutate(consistency = probability_selected == pmax(probability1, probability2))
+  
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+plot_consistency_by <- function(x) {
+  consistency_check |> 
+    summarize(consistency_ratio = mean(consistency), .by = response_id) |>
+    left_join(respondent_metadata, by = "response_id") |> 
+    ggplot(aes({{ x }})) +
+    geom_bar() +
+    facet_wrap(vars(factor(consistency_ratio)), ncol = 1,
+               strip.position = "right", scale = "free_y")
+}
+
+plot_consistency_by(age_band)
+plot_consistency_by(english_background)
+plot_consistency_by(education_level)
+plot_consistency_by(country_of_residence)
+```
+
+```{r}
+
+consistency_check |> 
+  filter(!consistency) |> 
+  ggplot(aes(selected)) +
+  geom_bar() +
+  coord_flip()
+
+inconsistent_combinations <- consistency_check |> 
+  filter(!consistency) |> 
+  pivot_longer(term1:term2) |> 
+  arrange(response_id, pair_id, name, value) |> 
+  pivot_wider(id_cols = response_id:selected) |> 
+  count(term1, term2, sort = TRUE)
+
+library(igraph)
+
+set.seed(1)
+
+inconsistent_combinations_wider <- inconsistent_combinations |> 
+  arrange(term2) |> 
+  pivot_wider(names_from = term2,  values_from = n, values_fill = 0) |> 
+  arrange(term1)
+
+# Create a graph from an adjacency matrix
+data <- inconsistent_combinations_wider[, -1] |> 
+  as.matrix()
+
+rownames(data) <- colnames(data)
+
+network <- graph_from_adjacency_matrix(data, mode = "min",
+                                       weighted = TRUE)
+
+comm <- cluster_louvain(network)
+
+png("image/how_likely_is_likely.png", width = 800, height = 600)
+
+plot(comm, network,
+     edge.width = E(network)$weight / 10,
+     main = "Confused pairs - line width denotes # of inconsistent responds")
+title(sub = "Source: Kucharski AJ (2026) CAPphrase: Comparative and Absolute Probability phrase dataset. DOI: 10.5281/zenodo.18750055")
+
+dev.off()
+
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+# ggsave("image/how_likely_is_likely.png", width = 6, height = 5)
+```
