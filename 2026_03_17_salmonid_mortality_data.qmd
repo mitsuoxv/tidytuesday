@@ -1,0 +1,165 @@
+---
+title: "Salmonid Mortality Data"
+date: 2026-03-17
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2026-03-17")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+monthly_losses_data <- tt$monthly_losses_data
+monthly_mortality_data <- tt$monthly_mortality_data
+```
+
+```{r}
+
+skimr::skim(monthly_losses_data)
+
+monthly_losses_data |> 
+  count(species)
+
+monthly_losses_data |> 
+  count(geo_group)
+
+skimr::skim(monthly_mortality_data)
+
+monthly_mortality_data |> 
+  count(species)
+
+monthly_mortality_data |> 
+  count(geo_group)
+
+monthly_mortality_data |> 
+  count(species, geo_group, region, sort = TRUE)
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+monthly_mortality_data |> 
+  filter(geo_group == "country", region == "Norge") |> 
+  ggplot(aes(date, median)) +
+  geom_line(aes(color = species))
+
+monthly_mortality_data |> 
+  filter(geo_group == "area", region == "4") |> 
+  ggplot(aes(date, median)) +
+  geom_line(aes(color = species))
+
+monthly_mortality_data |> 
+  unite(col = "local", geo_group, region, sep = ": ") |> 
+  ggplot(aes(date, median)) +
+  geom_line(aes(color = local)) +
+  facet_wrap(vars(species), ncol = 1)
+
+country_data <- monthly_mortality_data |> 
+  filter(geo_group == "country", region == "Norge") |> 
+  mutate(
+    species = factor(species,
+                     levels = c("salmon", "rainbowtrout"),
+                     labels = c("Salmon", "Rainbow trout"))
+  )  
+
+p <- country_data |> 
+  ggplot(aes(date, median)) +
+  geom_ribbon(aes(ymin = q1, ymax = q3), fill = "gray80") +
+  geom_line(color = "gray50") +
+  geom_ribbon(aes(ymin = q1, ymax = q3), fill = "red", alpha = 0.3,
+                data = country_data |> filter(date >= as.Date("2025-01-01"))) +
+  geom_line(color = "red",
+                data = country_data |> filter(date >= as.Date("2025-01-01"))) +
+  annotate("text", x = as.Date("2020-01-01"), y = 0.8,
+           label = "Median", hjust = 1.1, size = 3) +
+  annotate("text", x = as.Date("2020-01-01"), y = 1.5,
+           label = "Upper quartile", hjust = 1.1, size = 3) +
+  annotate("text", x = as.Date("2020-01-01"), y = 0.3,
+           label = "Lower quartile", hjust = 1.1, size = 3) +
+  scale_x_date(limits = c(as.Date("2020-01-01"), as.Date("2025-12-01")),
+               breaks = as.Date(paste0(2020:2025, "-01-01")),
+               date_labels = "%Y",
+               expand = expansion(mult = c(0.25, 0.02))) +
+  scale_y_continuous(limits = c(0, 2.8), expand = expansion(add = c(0, 0.1))) +
+  facet_wrap(vars(species), ncol = 1) +
+  labs(x = NULL, y = "Mortality",
+       title = "Mortality of salmon fell in 2025 in Norway,\nwhile that of rainbow trout failed to fall",
+       caption = "Source: Norwegian Veterinary Institute") +
+  theme(axis.text.x = element_text(hjust = -0.8),
+        panel.grid.minor.x = element_blank(),
+        strip.background = element_rect(fill = "white", color = "gray50"),
+        strip.text = element_text(color = "black"))
+
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/salmonid_mortaliy_data.png", width = 6, height = 4)
+```
