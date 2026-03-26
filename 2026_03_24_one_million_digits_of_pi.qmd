@@ -139,7 +139,7 @@ p <- tibble(same_consecutive = same_letters_5_or_more[[1]]) |>
   scale_fill_manual(values = c("steelblue", "pink", "red")) +
   guides(fill = guide_legend(reverse = TRUE)) +
   labs(x = "Digit", y = "Counts", fill = "Length",
-       title = "3333333 is the longest same digit repition in one million digits of pi, and\n1 is the most, and 4 is the least frequently repeated digit in 5 or more repitions",
+       title = "3333333 is the longest same digit repetition in one million digits of pi, and\n1 is the most, and 4 is the least frequently repeated digit in 5 or more repetitions",
        caption = "Source: One Million Digits of Pi (Eve Andersson collection)") +
   theme(plot.caption.position = "plot")
 
