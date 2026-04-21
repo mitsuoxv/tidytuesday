@@ -1,0 +1,181 @@
+---
+title: "Global Health Spending"
+date: 2026-04-21
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+# tt <- tt_load("2026-04-21")
+
+financing_schemes <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2026/2026-04-21/financing_schemes.csv')
+health_spending <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2026/2026-04-21/health_spending.csv')
+spending_purpose <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2026/2026-04-21/spending_purpose.csv')
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+# tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+# tt |> 
+  map(glimpse)
+```
+
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+glimpse(financing_schemes)
+skimr::skim(financing_schemes)
+
+glimpse(health_spending)
+skimr::skim(health_spending)
+
+glimpse(spending_purpose)
+skimr::skim(spending_purpose)
+
+```
+
+```{r}
+
+financing_schemes |> 
+  count(indicator_code, financing_scheme, unit)
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+oops_share <- financing_schemes |> 
+  filter(indicator_code == "hf3_che")
+
+oops_share |> 
+  ggplot(aes(year, value)) +
+  geom_line(aes(color = country_name), show.legend = FALSE) +
+  geom_smooth()
+
+range(oops_share$year)
+
+skimr::skim(oops_share)
+
+large_change_country_codes <- oops_share |> 
+  summarize(
+    change = last(value) - first(value),
+    .by = iso3_code
+  ) |> 
+  filter(change < -25) |>
+  pull(iso3_code)
+
+large_change_countries <- oops_share |> 
+  filter(iso3_code %in% large_change_country_codes)
+
+large_change_countries |> 
+  mutate(country_name = fct_reorder2(country_name, year, value)) |> 
+  ggplot(aes(year, value)) +
+  geom_line(aes(color = country_name))
+
+```
+
+```{r}
+
+high_start_country_codes <- oops_share |> 
+  filter(year == 2000, value > 60) |> 
+  pull(iso3_code)
+
+oops_share |> 
+  filter(iso3_code %in% high_start_country_codes) |> 
+  mutate(country_name = fct_reorder2(country_name, year, value)) |> 
+  ggplot(aes(year, value)) +
+  geom_line(aes(color = country_name))
+```
+
+```{r}
+
+p <- oops_share |> 
+  summarize(
+    latest = last(value),
+    oldest = first(value),
+    change = latest - oldest,
+    .by = country_name
+  ) |> 
+  filter(abs(change) > 25) |> 
+  mutate(
+    country_name = country_name |> 
+      fct_reorder(change) |> 
+      fct_rev(),
+    decline = change < 0
+  ) |> 
+  ggplot(aes(oldest, country_name)) +
+  geom_point(aes(color = decline), show.legend = FALSE) +
+  geom_segment(aes(xend = latest, color = decline),
+               arrow = arrow(length = unit(2,"mm")),
+               show.legend = FALSE) +
+  scale_x_continuous(limits = c(0, 90),
+                     expand = expansion(add = c(0, 0))) +
+  labs(x = "Percent share of household out-of-pocket payments (OOPS)\nin current health expenditure", y = NULL,
+       title = "OOPS share in health expenditure decreased most in Maldives,\nand increased most in Mongolia between 2000 and 2023",
+       subtitle = "Countries that changed more than 25 percent points",
+       caption = "Source: WHO Global Health Expenditure Database (GHED)") +
+  theme(plot.title.position = "plot")
+  
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/global_health_spending.png", p, width = 6, height = 5)
+```
