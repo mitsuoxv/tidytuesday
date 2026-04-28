@@ -1,0 +1,220 @@
+---
+title: "US Agricultural Tariffs"
+date: 2026-04-28
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2026-04-28")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+agreements <- tt$agreements
+quantity_codes <- tt$quantity_codes
+tariff_agricultural <- tt$tariff_agricultural
+tariff_codes <- tt$tariff_codes
+
+```
+
+```{r}
+
+skimr::skim(tariff_agricultural)
+
+skimr::skim(tariff_codes)
+
+tariff_agricultural |> 
+  count(rate_type_code, sort = TRUE)
+
+tariff_agricultural |> 
+  filter(ad_val_rate > 0) |> 
+  count(rate_type_code, sort = TRUE)
+
+tariff_agricultural |> 
+  filter(specific_rate > 0) |> 
+  count(rate_type_code, sort = TRUE)
+
+tariff_agricultural |> 
+  filter(ad_val_rate > 0, specific_rate > 0) |> 
+  count(rate_type_code, sort = TRUE)
+
+tariff_agricultural |> 
+  filter(rate_type_code == "0") |> 
+  count(agreement, sort = TRUE)
+
+tariff_agricultural |> 
+  filter(agreement == "mfn") |> 
+  count(rate_type_code, sort = TRUE)
+
+tariff_agricultural |> 
+  filter(agreement == "mfn") |> 
+  count(hts8, sort = TRUE) |> View()
+
+tariff_agricultural |> 
+  filter(agreement == "mfn", hts8 == "10063010") |> View()
+
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+tariff_agricultural |> 
+  filter(agreement == "mfn", rate_type_code == "7", ad_val_rate < 1) |> 
+  ggplot(aes(begin_effective_date, ad_val_rate)) +
+  geom_step(aes(color = hts8), show.legend = FALSE)
+
+tariff_rate_change_by_agreement <- function(x) {
+  tariff_agricultural |> 
+    filter(agreement == x, rate_type_code == "7") |> 
+    ggplot(aes(begin_effective_date, ad_val_rate)) +
+    geom_step(aes(color = hts8), show.legend = FALSE)
+}
+
+tariff_rate_change_by_agreement("mexico")
+tariff_rate_change_by_agreement("usmca")
+tariff_rate_change_by_agreement("japan")
+tariff_rate_change_by_agreement("korea")
+tariff_rate_change_by_agreement("mfn")
+
+```
+
+
+```{r}
+
+# 1760 duty-free from Mexico on 2024-01-01
+
+mexico_duty_free <- tariff_agricultural |> 
+  filter(
+    agreement == "mexico",
+    rate_type_code == "0",
+    end_effective_date >= as.Date("2024-01-01")
+  ) |> 
+  slice_max(order_by = begin_effective_date, n = 1, by = hts8) |> 
+  pull(hts8)
+
+korea_climb_to_mexico <- tariff_agricultural |> 
+  filter(agreement == "korea", hts8 %in% mexico_duty_free) |> 
+  arrange(hts8) |> 
+  mutate(
+    change = rate_type_code != lag(rate_type_code),
+    .by = hts8
+  )
+
+range(korea_climb_to_mexico$begin_effective_date) # "2012-03-15" "2024-01-01"
+
+# 1422
+korea_climb_to_mexico |> 
+  distinct(hts8)
+
+# zero from start, 753
+zero_from_start <- korea_climb_to_mexico |> 
+  mutate(
+    all_zero = all(rate_type_code == "0"),
+    .by = hts8
+  ) |> 
+  filter(all_zero) |> 
+  arrange(hts8, begin_effective_date) |> 
+  distinct(hts8, .keep_all = TRUE)
+
+# never zero, 70
+korea_climb_to_mexico |> 
+  summarize(
+    all_non_zero = all(rate_type_code != "0"),
+    .by = hts8
+  ) |> 
+  filter(all_non_zero)
+
+# change to zero, 599
+change_to_zero <- korea_climb_to_mexico |> 
+  filter(change, rate_type_code == "0")
+
+p <- bind_rows(zero_from_start, change_to_zero) |> 
+  count(begin_effective_date) |> 
+  bind_rows(tibble(begin_effective_date = as.Date("2024-01-01"), n = 0)) |> 
+  arrange(begin_effective_date) |> 
+  mutate(cumsum_n = cumsum(n)) |> 
+  ggplot(aes(begin_effective_date, cumsum_n)) +
+  geom_step() +
+  geom_hline(yintercept = 1760, linewidth = 2) +
+  annotate("text", x = as.Date("2018-01-01"), y = 1700, label = "Mexico") +
+  annotate("text", x = as.Date("2019-01-01"), y = 1150, label = "Korea") +
+  scale_x_date(expand = expansion(add = c(0, 80))) +
+  scale_y_continuous(labels = scales::label_comma(),
+                     limits = c(0, 1760),
+                     expand = expansion(add = c(0, 0))) +
+  labs(x = "Year start", y = "# of duty-free codes",
+       title = "Korea has tried hard to get duty-free access to\nthe US agricultural market",
+       subtitle = "In 1760 HTS8 codes Mexico gets duty-free",
+       caption = "Source: DataWeb: Annual Tariff Data")
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/us_agricultural_tariffs.png", p, width = 6, height = 4)
+```
