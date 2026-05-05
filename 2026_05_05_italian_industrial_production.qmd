@@ -1,0 +1,152 @@
+---
+title: "Italian Industrial Production"
+date: 2026-05-05
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2026-05-05")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+food_beverages <- tt$food_beverages |> janitor::clean_names()
+textiles <- tt$textiles |> janitor::clean_names()
+transport <- tt$transport |> janitor::clean_names()
+
+```
+
+```{r}
+skimr::skim(food_beverages)
+skimr::skim(textiles)
+skimr::skim(transport)
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+transport |> 
+  mutate(avg_weight_per_ship = ships_weight / ships_launched) |> 
+  ggplot(aes(year, avg_weight_per_ship)) +
+  geom_line() +
+  geom_point()
+
+```
+
+```{r}
+food_beverages |> 
+  filter(!is.na(sugar), !is.na(glucose), !is.na(coffee_substitute),
+         !is.na(seed_oil), !is.na(ethyl_alcohol_1), !is.na(ethyl_alcohol_2))
+
+food_beverages |> 
+  mutate(across(!year, \(x) x / x[year == 1916])) |> 
+  pivot_longer(!year) |> 
+  filter(!is.na(value)) |> 
+  mutate(name = fct_reorder2(name, year, value)) |> 
+  ggplot(aes(year, value)) +
+  geom_line(aes(color = name))
+```
+
+```{r}
+textiles |> 
+  filter(!is.na(total_yarn), !is.na(total_textiles), !is.na(raw_silk))
+
+p <- textiles |>
+  select(year, total_yarn, total_textiles, raw_silk) |> 
+  mutate(across(!year, \(x) x / x[year == 1930])) |> 
+  pivot_longer(!year) |> 
+  filter(!is.na(value)) |> 
+  mutate(
+    name = name |> 
+      fct_reorder2(year, value) |> 
+      factor(labels = c("Textiles", "Yarn", "Raw silk"))
+  ) |> 
+  ggplot(aes(year, value)) +
+  geom_vline(xintercept = 1930, lty = 3) +
+  geom_hline(yintercept = 1, lty = 3) +
+  geom_line(aes(color = name)) +
+  scale_x_continuous(breaks = 186:199 * 10,
+                     labels = c("1860", "", "", "", "1900", "", "", "1930",
+                                "", "", "1960", "", "", "1990")) +
+  scale_y_continuous(expand = expansion(add = c(0.01, 0.05))) +
+  labs(x = NULL, y = "Production in tons (1930 = 1)", color = NULL,
+       title = "Since 1930 Italian comparative advantage has worked out to\ndouble textile production, and to eliminate raw silk production.",
+       caption = "Source: Italian National Institute of Statistics") +
+  theme(panel.grid.minor.x = element_blank(),
+        plot.caption.position = "plot",
+        plot.title.position = "plot")
+
+```
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/italian_industrial_production.png", p, width = 6, height = 4)
+```
