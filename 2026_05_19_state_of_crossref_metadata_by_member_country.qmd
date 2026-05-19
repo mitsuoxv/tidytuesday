@@ -1,0 +1,262 @@
+---
+title: "State of Crossref Metadata by Member Country"
+date: 2026-05-19
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2026-05-19")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+member_participation_stats_by_country <- tt$member_participation_stats_by_country
+metadata_coverage_stats_by_country <- tt$metadata_coverage_stats_by_country
+
+```
+
+```{r}
+skimr::skim(member_participation_stats_by_country)
+skimr::skim(metadata_coverage_stats_by_country)
+```
+
+```{r}
+
+metadata_coverage_stats_by_country |> 
+  count(current_up_to, sort = TRUE)
+
+metadata_coverage_stats_by_country |> 
+  count(iso3_code, sort = TRUE)
+
+metadata_coverage_stats_by_country |> 
+  count(document_type, sort = TRUE)
+```
+
+```{r}
+
+library(countrycode)
+
+countrycode("USA", origin = "iso3c", destination = "country.name")
+
+member_participation_stats_by_country2 <-
+  member_participation_stats_by_country |> 
+  mutate(country = countrycode(iso3_code, origin = "iso3c", destination = "country.name", custom_match = c("XKX" = "Kosovo")))
+
+metadata_coverage_stats_by_country2 <- 
+  metadata_coverage_stats_by_country |> 
+mutate(country = countrycode(iso3_code, origin = "iso3c", destination = "country.name", custom_match = c("XKX" = "Kosovo")))
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+draw_member_participation <- function(x) {
+  member_participation_stats_by_country2 |> 
+    mutate(iso3_code = fct_lump_n(iso3_code, n = 10, w = {{ x }})) |> 
+    filter(iso3_code != "Other") |> 
+    mutate(
+      country = fct_reorder2(country, current_up_to, {{ x }})
+    ) |> 
+    ggplot(aes(current_up_to, {{ x }})) +
+    geom_line(aes(color = country))
+}
+
+draw_member_participation(total_members)
+draw_member_participation(deposits_ref)
+draw_member_participation(deposits_abstract)
+draw_member_participation(deposits_license)
+draw_member_participation(deposits_crossmark)
+draw_member_participation(deposits_updates)
+draw_member_participation(deposits_textmining)
+draw_member_participation(deposits_status_info) # error
+draw_member_participation(acknowledges_funding)
+draw_member_participation(deposits_funder_id)
+draw_member_participation(deposits_grant_id) # error
+draw_member_participation(deposits_orcid)
+draw_member_participation(deposits_orcid_for_authors)
+draw_member_participation(deposits_orcid_for_chairs)
+draw_member_participation(deposits_orcid_for_editors)
+draw_member_participation(deposits_orcid_for_translators)
+draw_member_participation(deposits_ror_id)
+draw_member_participation(deposits_ror_id_for_affiliations)
+draw_member_participation(deposits_ror_id_for_funders)
+draw_member_participation(deposits_ror_id_for_institutions)
+
+```
+
+```{r}
+
+draw_metadata_coverage <- function(doc_type, x) {
+  metadata_coverage_stats_by_country2 |> 
+    filter(document_type == doc_type) |> 
+    mutate(iso3_code = fct_lump_n(iso3_code, n = 10, w = {{ x }})) |> 
+    filter(iso3_code != "Other") |> 
+    mutate(
+      country = fct_reorder2(country, current_up_to, {{ x }})
+    ) |> 
+    ggplot(aes(current_up_to, {{ x }})) +
+    geom_line(aes(color = country)) +
+    scale_y_continuous(labels = scales::label_comma())
+}
+
+draw_metadata_coverage("journal-article", n_dois)
+draw_metadata_coverage("journal-article", with_ref)
+draw_metadata_coverage("journal-article", with_doi_ref)
+draw_metadata_coverage("journal-article", references)
+draw_metadata_coverage("journal-article", references_with_dois)
+draw_metadata_coverage("journal-article", references_with_doi_asserted_by_publisher)
+draw_metadata_coverage("journal-article", references_with_doi_asserted_by_crossref)
+draw_metadata_coverage("journal-article", citations_received)
+draw_metadata_coverage("journal-article", retractions)
+
+```
+
+
+```{r}
+
+draw_facet_by_document_type <- function(cnt, x){
+  metadata_coverage_stats_by_country2 |> 
+  filter(country == cnt) |> 
+  ggplot(aes(current_up_to, {{ x }})) +
+  geom_line() +
+  facet_wrap(vars(document_type))
+}
+
+draw_facet_by_document_type("Indonesia", n_dois)
+draw_facet_by_document_type("United States", n_dois)
+draw_facet_by_document_type("Netherlands", n_dois)
+draw_facet_by_document_type("South Korea", n_dois)
+draw_facet_by_document_type("Germany", n_dois)
+draw_facet_by_document_type("China", n_dois)
+
+draw_facet_by_document_type("United States", citations_received)
+
+```
+
+```{r}
+
+metadata_coverage_stats_by_country2 |> 
+  filter(country == "Indonesia", document_type == "journal-article") |> 
+  pivot_longer(n_dois:retractions) |> 
+  ggplot(aes(current_up_to, value)) +
+  geom_line(aes(color = name), show.legend = FALSE)
+
+metadata_coverage_stats_by_country2 |> 
+  filter(country %in% c("Indonesia", "Germany"),
+         document_type == "journal-article") |> 
+  pivot_longer(n_dois:retractions) |> 
+  ggplot(aes(current_up_to, value)) +
+  geom_line(aes(color = name), show.legend = FALSE) +
+  facet_wrap(vars(country))
+
+draw_country_metadata_pattern <- function(cnt){
+  metadata_coverage_stats_by_country2 |> 
+  filter(country == cnt, document_type == "journal-article") |> 
+  pivot_longer(n_dois:retractions) |> 
+  ggplot(aes(current_up_to, value)) +
+  geom_line() +
+  facet_wrap(vars(name))
+}
+
+draw_country_metadata_pattern("Germany")
+draw_country_metadata_pattern("Indonesia")
+draw_country_metadata_pattern("United States")
+draw_country_metadata_pattern("Netherlands")
+
+p <- metadata_coverage_stats_by_country2 |> 
+  filter(document_type == "journal-article") |> 
+  mutate(
+    citations_per_n_dois = citations_received / n_dois,
+    iso3_code = fct_lump_n(iso3_code, n = 10, w = citations_per_n_dois)
+  ) |> 
+  filter(iso3_code != "Other") |> 
+  mutate(
+      country = fct_reorder2(country, current_up_to, citations_per_n_dois)
+  ) |> 
+  ggplot(aes(current_up_to, citations_per_n_dois)) +
+  geom_line(aes(color = country)) +
+  scale_color_brewer(palette = "Paired") +
+  scale_x_date(date_labels = "%Y",
+               date_breaks = "1 year") +
+  scale_y_continuous(limits = c(0, 22),
+                     expand = expansion(mult = c(0, 0.05))) +
+  labs(x = NULL, y = "Citations received per work",
+       color = "Country",
+       title = "The Netherlands took over the United States in 2024 as top country\nin citations per Crossref-registered work of journal article",
+       caption = "Source: State of Crossref metadata by member country") +
+  theme(plot.caption.position = "plot",
+        axis.text.x = element_text(hjust = -0.4),
+        panel.grid.minor.x = element_blank())
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/state_of_crossref_metadata_by_member_country.png", p, width = 7, height = 4)
+```
