@@ -93,12 +93,11 @@ Using your processed dataset, create your unique visualization.
 draw_by_year_country <- function(x) {
   basotho_wool |> 
     filter(cmd_code == "5101") |> 
-    mutate(
-      net_wgt = sum({{ x }}) / 1e6,
+    summarize(
+      annual = sum({{ x }}) / 1e6,
       .by = c(ref_year, reporter_desc)
     ) |> 
-    count(ref_year, reporter_desc, wt = net_wgt) |> 
-    ggplot(aes(ref_year, n)) +
+    ggplot(aes(ref_year, annual)) +
     geom_col(aes(fill = reporter_desc))
 }
 
@@ -110,7 +109,7 @@ p <- basotho_wool |>
     cmd_code == "5101",
     reporter_desc %in% c("South Africa", "China")
   ) |> 
-  mutate(
+  summarize(
     net_wgt_annual = sum(net_wgt),
     primary_value_annual = sum(primary_value),
     price = primary_value_annual / net_wgt_annual,
