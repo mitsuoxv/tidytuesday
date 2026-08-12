@@ -1,0 +1,141 @@
+---
+title: "The Palomar Spectroscopic Survey of Nearby Galaxies"
+date: 2026-08-12
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2026-08-11")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+palomar_emission_lines <- tt$palomar_emission_lines
+palomar_survey <- tt$palomar_survey
+
+```
+
+```{r}
+
+palomar_survey |> 
+  count(classification_confidence)
+
+palomar_survey |> 
+  count(activity_type)
+
+palomar_survey |> 
+  filter(classification_confidence == "confident") |> 
+  count(activity_type)
+```
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+palomar_survey |> 
+  filter(classification_confidence == "confident") |> 
+  ggplot(aes(velocity_dispersion_km_s)) +
+  geom_histogram() +
+  facet_wrap(vars(activity_type))
+  
+```
+
+```{r}
+
+p <- palomar_emission_lines |> 
+  left_join(palomar_survey, by = "galaxy_name") |> 
+  filter(
+    !is.na(activity_type),
+    activity_type != "Absorption"
+  ) |> 
+  mutate(
+    y = oiii_5007 / h_beta,
+    x = nii_6583
+  ) |> 
+  ggplot(aes(x, y)) +
+  geom_point(aes(shape = activity_type, color = activity_type),
+                 size = 3, alpha = 0.8) +
+  scale_x_log10() +
+  scale_y_log10() +
+  scale_color_brewer(palette = "Set2") +
+  labs(y = "[O III] 5007 / H-beta (log-scale)",
+       x = "[N II] 6583 / H-alpha (log-scale)",
+       color = "Galaxy nuclear activity\nclassification",
+       shape = "Galaxy nuclear activity\nclassification",
+       title = "It is difficult to distinguish Transition from LINER in BPT diagnostic diagram",
+       caption = "Source: VizieR Astronomical Catalogs (Ho, Filippenko & Sargent 1995, 1997, 2009)") +
+  theme(plot.caption.position = "plot",
+        plot.title.position = "plot")
+
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/the_palomar_spectroscopic_survey_of_nearby_galaxies.png", p, width = 7, height = 5)
+```
