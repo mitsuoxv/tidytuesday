@@ -1,0 +1,134 @@
+---
+title: "IELTS exam results"
+date: 2026-08-24
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2026-08-18")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+demo_by_first_language <- tt$demo_by_first_language
+demo_by_nationality <- tt$demo_by_nationality
+demo_by_reasons <- tt$demo_by_reasons
+performance_by_first_language <- tt$performance_by_first_language
+performance_by_nationality <- tt$performance_by_nationality
+
+```
+
+```{r}
+
+skimr::skim(demo_by_first_language)
+skimr::skim(demo_by_nationality)
+skimr::skim(demo_by_reasons)
+skimr::skim(performance_by_first_language)
+skimr::skim(performance_by_nationality)
+
+performance_by_first_language |> 
+  count(language, sort = TRUE)
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+performance_by_first_language2 <- performance_by_first_language |> 
+  mutate(
+    part = factor(part, 
+                  levels = c("overall", "speaking", "writing","reading", "listening"))
+  )
+
+p <- performance_by_first_language2 |> 
+  ggplot(aes(score, part)) +
+  geom_point(color = "gray60", alpha = 1/3,
+             position = position_jitter(height = 1/4),
+             data = performance_by_first_language2 |> 
+               filter(language != "English"),
+             show.legend = FALSE) +
+  geom_point(color = "red",
+             position = position_jitter(height = 1/8),
+             data = performance_by_first_language2 |> 
+               filter(language == "English"),
+             show.legend = FALSE) +
+  facet_wrap(vars(year)) +
+  labs(x = "Mean score by native language", y = "Part of the test",
+       title = "English natives are very competitive in writing and speaking,\nbut less so in reading and listening of\nInternational English Language Testing System (IELTS)",
+       subtitle = "Red points denote English natives, and gray points denote non-English natives",
+       caption = "Source: IELTS official statistics")
+
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/ielts_exam_results.png", p, width = 7, height = 5)
+```
