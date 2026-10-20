@@ -1,0 +1,145 @@
+---
+title: "Which College Majors Are Safest from AI (and Do They Pay)?"
+date: 2026-10-20
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2026-10-20")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+ai_salary_majors <- tt$ai_salary_majors
+major_occupations <- tt$major_occupations
+
+```
+
+```{r}
+
+skimr::skim(ai_salary_majors)
+skimr::skim(major_occupations)
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+ai_salary_majors |> 
+  ggplot(aes(ai_exposure, median_starting_salary)) +
+  geom_point()
+
+ai_salary_majors |> 
+  ggplot(aes(ai_exposure, median_salary_4yr)) +
+  geom_point()
+
+ai_salary_majors2 <- ai_salary_majors |> 
+  mutate(salary_growth_4yr = median_salary_4yr / median_starting_salary)
+
+ai_salary_majors2 |> 
+  ggplot(aes(ai_exposure, salary_growth_4yr)) +
+  geom_point()
+
+ai_salary_majors3 <- ai_salary_majors2 |> 
+  pivot_longer(c(ai_exposure, ai_exposure_language:ai_exposure_image))
+
+scatterplot_faceted_by_image_or_language <- function(x) {
+  ai_salary_majors3 |> 
+    ggplot(aes(value, {{ x }})) +
+    geom_point(alpha = 1/3) +
+    geom_smooth(method = "lm") +
+    facet_wrap(vars(name))
+}
+
+scatterplot_faceted_by_image_or_language(salary_growth_4yr)
+scatterplot_faceted_by_image_or_language(median_starting_salary)
+scatterplot_faceted_by_image_or_language(median_salary_4yr)
+
+p <- ai_salary_majors3 |> 
+  mutate(name = factor(name,
+                       levels = c("ai_exposure", "ai_exposure_language", "ai_exposure_image"),
+                       labels = c("Total", "Text-based tasks", "Visual tasks"))) |> 
+  ggplot(aes(value, median_starting_salary)) +
+  geom_point(alpha = 1/5) +
+  geom_smooth(method = "lm") +
+  scale_y_continuous(labels = scales::label_dollar()) +
+  facet_wrap(vars(name)) +
+  labs(x = "Average AI Occupational Exposure (AIOE) score (standardized)",
+       y = "Median earnings\nfor one year after graduation",
+       title = "AI exposure in total does not look correlated with starting salary,\nthough that in text-based tasks tends to reduce, and\nthat in visual tasks tends to increase it",
+       subtitle = "285 college majors (bachelor's degree)",
+       caption = "Source: US Dept. of Education College Scorecard + AI Occupational Exposure (Felten, Raj & Seamans) +\nNCES/BLS CIP-SOC crosswalk")
+
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/which_college_majors_are_safest_from_ai.png", p, width = 7, height = 4)
+```
