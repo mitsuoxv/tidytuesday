@@ -1,0 +1,177 @@
+---
+title: "IKEA Sofas and Their Swedish Places"
+date: 2026-10-27
+execute: 
+  echo: true
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(tidytuesdayR)
+
+theme_set(theme_light())
+```
+
+
+# Load the weekly Data
+
+Download the weekly data and make available in the `tt` object.
+
+```{r}
+#| label: Load
+
+tt <- tt_load("2026-10-27")
+
+```
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r}
+#| label: Readme
+#| eval: interactive()
+
+tt
+
+```
+
+# Glimpse Data
+
+Take an initial look at the format of the data available.
+
+```{r}
+#| label: Glimpse
+
+tt |> 
+  map(glimpse)
+```
+
+
+# Wrangle
+
+Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
+
+```{r}
+#| label: Wrangle
+
+ikea_places <- tt$ikea_places
+ikea_seating <- tt$ikea_seating
+
+```
+
+```{r}
+
+skimr::skim(ikea_places)
+skimr::skim(ikea_seating)
+
+ikea_places |> 
+  count(name, sort = TRUE)
+
+# name is not unique
+ikea_places |> 
+  filter(name == "AGEN")
+
+ikea_seating |> 
+  count(name, product_type, item_no, sort = TRUE)
+
+double_countries <- ikea_seating |> 
+  filter(name == "SÖDERHAMN", item_no == "69330512") |>
+  count(country, sort = TRUE) |> 
+  filter(n > 1) |> 
+  pull(country)
+
+ikea_seating |> 
+  filter(name == "SÖDERHAMN", item_no == "69330512") |>
+  filter(country %in% double_countries) |> View()
+
+ikea_seating |> 
+  distinct(country, name, product_type, item_no, price_usd) |> 
+  count(country, name, product_type, item_no, sort = TRUE)
+
+ikea_seating |> 
+  filter(country == "in", name == "EKENÄSET",
+         product_type == "Armchair", item_no == "90533174") |> View()
+
+ikea_seating_usd <- ikea_seating |> 
+  filter(country != "in", name != "EKENÄSET",
+         product_type != "Armchair", item_no != "90533174",
+         price_usd != 177.09) |> 
+  distinct(country, name, product_type, item_no, price, price_usd, currency)
+
+skimr::skim(ikea_seating_usd)
+
+ikea_seating_usd |> 
+  count(item_no, sort = TRUE)
+
+ikea_seating_usd |> 
+  count(country, item_no, sort = TRUE)
+
+ikea_seating_usd |> 
+  count(country, sort = TRUE)
+
+item_no_common <- ikea_seating_usd |> 
+  count(item_no, sort = TRUE) |> 
+  filter(n == 49) |> 
+  pull(item_no)
+
+```
+
+
+# Visualize
+
+Using your processed dataset, create your unique visualization.
+
+```{r}
+#| label: Visualize
+
+library(countrycode)
+
+p <- ikea_seating_usd |> 
+  filter(item_no %in% item_no_common) |> 
+  mutate(
+    country_name = countrycode(country, origin = "iso2c", destination = "country.name"),
+    country_name = fct_reorder(country_name, price_usd,
+                               .fun = \(x) mean(log10(x))),
+    euro = if_else(currency == "EUR", "Euro area", "Non-euro area")
+  ) |> 
+  ggplot(aes(country_name, price_usd)) +
+  geom_line(aes(group = item_no, color = item_no),
+            lineend = 4, show.legend = FALSE) +
+  geom_point(aes(fill = euro), shape = 21) +
+  scale_y_log10(labels = scales::label_dollar(accuracy = 1)) +
+  scale_fill_manual(values = c("red", "white")) +
+  scale_color_brewer(palette = "Paired") +
+  labs(x = NULL, y = "Price in USD (log scale)\n(converted at the exchange rate for 28 September 2026)",
+       fill = NULL,
+       title = "Mexico and Jordan are among the highest priced areas of IKEA products",
+       subtitle = "49 area are in order of log mean of 7 IKEA products which are sold in all areas",
+       caption = "Source: IKEA product listings, and fawazahmed0 exchange rates") +
+  coord_flip() +
+  theme(legend.position = "bottom",
+        plot.title.position = "plot")
+  
+```
+
+
+# Save Image
+
+Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
+
+```{r}
+
+# This will save your most recent plot
+ggsave("image/ikea_sofas_and_their_swedish_places.png", p, width = 7, height = 7)
+```
